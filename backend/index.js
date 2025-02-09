@@ -16,6 +16,7 @@ app.use(cors());
 
 app.use('/auth', AuthRouter)
 app.use('/dashboard', dashrouter )
+app.use('/admin', dashrouter )
 
 app.get('/ping', (req, res) => {
     res.send('pong')

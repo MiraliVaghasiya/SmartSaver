@@ -11,6 +11,7 @@ function Signup() {
     password: ''
   });
 
+  const [loading, setLoading] = useState(false); // ✅ Loading state
   const navigate = useNavigate();
 
   const handleChange = (e) => {
@@ -29,6 +30,8 @@ function Signup() {
       return handleError('Name, email, and password are required');
     }
 
+    setLoading(true); // ✅ Show loading state
+
     try {
       const response = await fetch("http://localhost:8080/auth/signup", {
         method: 'POST',
@@ -37,16 +40,22 @@ function Signup() {
       });
 
       const result = await response.json();
+      setLoading(false); // ✅ Hide loading state
 
       if (result.success) {
         handleSuccess(result.message);
-        setTimeout(() => navigate('/login'), 1000);
+
+        // ✅ Store token and login user automatically
+        localStorage.setItem("token", result.jwtToken);
+        localStorage.setItem("loggedInUser", result.name);
+
+        setTimeout(() => navigate('/dashboard'), 1000); // ✅ Redirect to dashboard
       } else {
         const errorMessage = result.error?.details[0]?.message || result.message;
         handleError(errorMessage);
       }
-
     } catch (err) {
+      setLoading(false);
       handleError(err.message || 'An error occurred');
     }
   };
@@ -67,7 +76,9 @@ function Signup() {
           <label>Password :</label>
           <input type="password" name="password" placeholder="Enter your password..." onChange={handleChange} value={signupInfo.password} />
         </div>
-        <button type="submit">Signup</button>
+        <button type="submit" disabled={loading}>
+          {loading ? "Signing Up..." : "Signup"}
+        </button>
         <span>Already have an account? <Link to="/login">Login</Link></span>
       </form>
       <ToastContainer />

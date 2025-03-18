@@ -9,28 +9,33 @@ import RefreshHandler from "./RefreshHandler";
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
+<<<<<<< HEAD
+=======
+  // Check localStorage for token on page load
+>>>>>>> 9326144 (error solve and frontend by darshan)
   useEffect(() => {
     const token = localStorage.getItem("token");
     setIsAuthenticated(!!token);
   }, []);
+<<<<<<< HEAD
   
+=======
+
+  // Private route logic
+>>>>>>> 9326144 (error solve and frontend by darshan)
   const PrivateRoute = ({ element }) => {
     return isAuthenticated ? element : <Navigate to="/login" />;
   };
 
   return (
-    // Wrap the entire app in GoogleOAuthProvider
-    <GoogleOAuthProvider clientId="889292981742-rplblsl1opsnklj0465vupmm17d7h76p.apps.googleusercontent.com">
+    <GoogleOAuthProvider clientId="889292981742-ucknqtugi62s3em7r185in1prat5revr.apps.googleusercontent.com">
       <div>
         <RefreshHandler setIsAuthenticated={setIsAuthenticated} />
         <Routes>
           <Route path="/" element={<Navigate to="/login" />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route
-            path="/dashboard"
-            element={<PrivateRoute element={<Dashboard />} />}
-          />
+          <Route path="/login" element={<Login setIsAuthenticated={setIsAuthenticated} />} />
+          <Route path="/signup" element={<Signup setIsAuthenticated={setIsAuthenticated} />} />
+          <Route path="/dashboard" element={<PrivateRoute element={<Dashboard />} />} />
         </Routes>
       </div>
     </GoogleOAuthProvider>

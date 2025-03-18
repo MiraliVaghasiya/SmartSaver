@@ -16,40 +16,44 @@ router.post('/signup', signupValidation, signup);
 
 // Google One Tap Authentication
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-
 router.post("/google", async (req, res) => {
   try {
-    const { token } = req.body;
+    const { credential } = req.body;  // Ensure correct key name
 
-    // Verify Google Token
+    if (!credential) {
+      return res.status(400).json({ success: false, message: "Missing credential" });
+    }
+
     const ticket = await client.verifyIdToken({
-      idToken: token,
+      idToken: credential,  // Fix: Use "credential" instead of "token"
       audience: process.env.GOOGLE_CLIENT_ID,
     });
 
     const payload = ticket.getPayload();
     const email = payload.email;
     const name = payload.name;
-    const googleId = payload.sub; // Google Unique ID
+    const googleId = payload.sub; 
 
-    // Check if user exists
     let user = await userModel.findOne({ email });
 
     if (!user) {
       user = new userModel({ name, email, googleId });
       await user.save();
+    } else if (!user.googleId) {
+      user.googleId = googleId;
+      await user.save();
     }
 
-    // Generate JWT Token
     const jwtToken = jwt.sign({ email, _id: user._id }, process.env.JWT_SECRET, { expiresIn: "24h" });
 
-    res.json({ success: true, jwtToken, name });
+    res.json({ success: true, jwtToken, name, email });
   } catch (error) {
     console.error("Google Login Error:", error);
     res.status(401).json({ success: false, message: "Invalid Google token" });
   }
 });
 
+  
 // Google OAuth Redirect Flow (Passport)
 router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
 
@@ -67,5 +71,30 @@ router.get("/google/callback",
     res.redirect(`http://localhost:3000/google-auth-success?token=${token}&name=${req.user.name}`);
   }
 );
+router.post("/google-signup", async (req, res) => {
+  const { credential } = req.body;
+  if (!credential) return res.status(400).json({ success: false, message: "Missing credential" });
 
+  try {
+    const payload = await verifyGoogleToken(credential);
+
+    // Check if user already exists in DB
+    let user = await User.findOne({ email: payload.email });
+    if (!user) {
+      user = new User({
+        name: payload.name,
+        email: payload.email,
+        password: "", // No password for Google users
+      });
+      await user.save();
+    }
+
+    // Generate JWT token
+    const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, { expiresIn: "1h" });
+
+    res.json({ success: true, jwtToken: token });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Google authentication failed" });
+  }
+});
 module.exports = router;

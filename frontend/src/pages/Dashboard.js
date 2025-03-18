@@ -7,7 +7,10 @@ function Dashboard() {
   const [loggedInUser, setLoggedInUser] = useState('');
 
   useEffect(() => {
-    setLoggedInUser(localStorage.getItem('loggedInUser'));
+    const user = localStorage.getItem("loggedInUser");
+    if (user) {
+      setLoggedInUser(JSON.parse(user)); // Convert string to object
+    }
   }, []);
 
   const navigate  = useNavigate();
@@ -20,13 +23,15 @@ function Dashboard() {
     }, 1000);
   }
 
+  console.log(loggedInUser);
+  
   return (
     <div>
-      <h1>{loggedInUser}</h1>
+      <h1>{loggedInUser?.name}</h1>
       <button onClick={handleLogout }>Logout</button>
       <ToastContainer/>
     </div>
   );
 }
 
-export default Dashboard;
+export default Dashboard; 

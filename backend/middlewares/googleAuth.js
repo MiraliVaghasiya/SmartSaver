@@ -4,7 +4,6 @@ const userModel = require("../model/user");
 require("dotenv").config();
 
 
-
 passport.use(
   new GoogleStrategy(
     {

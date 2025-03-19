@@ -1,52 +1,29 @@
-import React, { useState, useEffect } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import React, { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { ToastContainer } from "react-toastify";
 import { handleError, handleSuccess } from "../utils";
-import GoogleLoginButton from "../components/GoogleLoginButton";
 import "react-toastify/dist/ReactToastify.css";
+import { GoogleLogin } from "@react-oauth/google";
+import ThreeShapes from "../components/ThreeShapes";
+import '../index.css'
 
-function Login() {
-  const [loginInfo, setLoginInfo] = useState({
-    email: "",
-    password: "",
-  });
-
+function Login({ setIsAuthenticated }) {
+  const [loginInfo, setLoginInfo] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    // Detect token from Google login response
-    const params = new URLSearchParams(location.search);
-    const token = params.get("token");
-    const name = params.get("name");
-
-    if (token && name) {
-      localStorage.setItem("token", token);
-      localStorage.setItem("loggedInUser", name);
-      handleSuccess(`Welcome, ${name}`);
-
-      // Prevent infinite redirection loop
-      window.history.replaceState({}, document.title, "/dashboard");
-
-      setTimeout(() => navigate("/dashboard"), 1000);
-    }
-  }, [location, navigate]);
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
-    setLoginInfo((prevState) => ({
-      ...prevState,
-      [name]: value,
-    }));
+    setLoginInfo({ ...loginInfo, [e.target.name]: e.target.value });
   };
 
+  // ✅ FIX: Set authentication state after successful login
   const handleLogin = async (e) => {
     e.preventDefault();
-    const { email, password } = loginInfo;
-    if (!email || !password) {
+    if (!loginInfo.email || !loginInfo.password) {
       return handleError("Email and password are required");
     }
 
+    setLoading(true);
     try {
       const response = await fetch("http://localhost:8080/auth/login", {
         method: "POST",
@@ -54,38 +31,82 @@ function Login() {
         body: JSON.stringify(loginInfo),
       });
 
-      const result = await response.json();
-      if (result.success) {
-        handleSuccess(result.message);
-        localStorage.setItem("token", result.jwtToken);
-        localStorage.setItem("loggedInUser", result.name);
-        setTimeout(() => navigate("/dashboard"), 1000);
+      const data = await response.json();
+      setLoading(false);
+
+      if (data.success) {
+        handleSuccess("Login successful!");
+        localStorage.setItem("token", data.jwtToken);
+        localStorage.setItem("loggedInUser", JSON.stringify({ name: data.name, email: data.email }));
+
+        setIsAuthenticated(true); // ✅ Update state
+        navigate("/dashboard");
       } else {
-        handleError(result.message);
+        handleError(data.message || "Login failed");
       }
     } catch (err) {
-      handleError(err.message || "An error occurred");
+      setLoading(false);
+      handleError("Something went wrong. Please try again!");
     }
   };
 
+  // ✅ FIX: Ensure correct endpoint for Google login
+  const handleGoogleLogin = (response) => {
+    fetch("http://localhost:8080/auth/google", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ credential: response.credential }),
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          handleSuccess("Google Login successful!");
+          localStorage.setItem("token", data.jwtToken);
+          localStorage.setItem("loggedInUser", JSON.stringify({ name: data.name, email: data.email }));
+          setIsAuthenticated(true); // ✅ Update authentication state
+          navigate("/dashboard");
+        } else {
+          handleError("Google Login failed. Try again.");
+        }
+      })
+      .catch(() => handleError("Something went wrong with Google Login!"));
+  };
+
   return (
-    <div className="container">
-      <h1>Login</h1>
-      <form onSubmit={handleLogin}>
-        <div>
-          <label>Email :</label>
-          <input type="email" name="email" placeholder="Enter your email..." onChange={handleChange} value={loginInfo.email} />
+    <>
+      <div style={{ position: "fixed", width: "100vw", height: "100vh" }}>
+        <ThreeShapes />
+      </div>
+      
+      <div className="login">
+        <div className="auth-container">
+
+        <h1 className="auth-title">Login</h1>
+        <form onSubmit={handleLogin} className="auth-form">
+          <div className="input-group">
+            <label htmlFor="email">Email</label>
+            <input id="email" className="auth-input" type="email" name="email" placeholder="Enter your email" onChange={handleChange} required />
+          </div>
+          <div className="input-group">
+            <label htmlFor="password">Password</label>
+            <input id="password" className="auth-input" type="password" name="password" placeholder="Enter your password" onChange={handleChange} required />
+          </div>
+          <button className="auth-button" type="submit" disabled={loading}>
+            {loading ? "Logging in..." : "Login"}
+          </button>
+          {/* Google Login Button */}
+          <GoogleLogin
+            onSuccess={handleGoogleLogin}
+            onError={() => handleError("Google login failed")}
+          />
+
+          <p className="auth-link">Don't have an account? <Link to="/signup">Signup</Link></p>
+        </form>
         </div>
-        <div>
-          <label>Password :</label>
-          <input type="password" name="password" placeholder="Enter your password..." onChange={handleChange} value={loginInfo.password} />
-        </div>
-        <button type="submit">Login</button>
-        <span>Don't have an account? <Link to="/signup">Signup</Link></span>
-      </form>
-      <GoogleLoginButton />
-      <ToastContainer />
-    </div>
+
+        <ToastContainer />
+      </div>
+    </>
   );
 }
 

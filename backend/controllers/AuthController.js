@@ -4,30 +4,39 @@ const jwt = require('jsonwebtoken');
 
 const signup = async (req, res) => {
     try {
-      const { name, email, password } = req.body;
-  
-      if (!name || !email || !password) {
-        return res.status(400).json({ message: "Please provide name, email, and password", success: false });
-      }
-  
-      const user = await usermodel.findOne({ email });
-      if (user) {
-        return res.status(400).json({ message: "Email already exists, you can login", success: false });
-      }
-  
-      // Encrypt password before saving
-      const hashedPassword = await bcrypt.hash(password, 10);
-      
-      const userModel = new usermodel({ name, email, password: hashedPassword });
-      await userModel.save();
-  
-      res.status(201).json({ message: "Signup successful", success: true });
-  
+        const { name, email, password } = req.body;
+
+        if (!name || !email || !password) {
+            return res.status(400).json({ message: "Please provide name, email, and password", success: false });
+        }
+
+        const existingUser = await usermodel.findOne({ email });
+        if (existingUser) {
+            return res.status(400).json({ message: "Email already exists, you can login", success: false });
+        }
+
+        // Encrypt password before saving
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        const user = new usermodel({ name, email, password: hashedPassword });
+        await user.save();
+
+        // ✅ Generate JWT Token immediately after signup
+        const jwtToken = jwt.sign({ email: user.email, _id: user._id }, process.env.JWT_SECRET, { expiresIn: "24h" });
+
+        res.status(201).json({
+            message: "Signup successful",
+            success: true,
+            jwtToken,  // ✅ Send token to frontend
+            name
+        });
+
     } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: "Internal server error", success: false });
+        console.error(err);
+        res.status(500).json({ message: "Internal server error", success: false });
     }
-  };
+};
+
   
   const login = async (req, res) => {
     try {
@@ -65,7 +74,6 @@ const signup = async (req, res) => {
     }
   };
   
-  module.exports = { signup, login };
-  
+ 
 
 module.exports = { signup, login };

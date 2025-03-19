@@ -5,7 +5,10 @@ import { handleError, handleSuccess } from "../utils";
 import "react-toastify/dist/ReactToastify.css";
 import { GoogleLogin } from "@react-oauth/google";
 import ThreeShapes from "../components/ThreeShapes";
+<<<<<<< HEAD
 import '../index.css'
+=======
+>>>>>>> cb95865671dc2bf6815f3d6013f206399c4b96a0
 
 function Login({ setIsAuthenticated }) {
   const [loginInfo, setLoginInfo] = useState({ email: "", password: "" });
@@ -74,6 +77,7 @@ function Login({ setIsAuthenticated }) {
 
   return (
     <>
+<<<<<<< HEAD
       <div style={{ position: "fixed", width: "100vw", height: "100vh" }}>
         <ThreeShapes />
       </div>
@@ -81,6 +85,12 @@ function Login({ setIsAuthenticated }) {
       <div className="login">
         <div className="auth-container">
 
+=======
+      <div style={{ position: "fixed", width: "100vw", height: "100vh", zIndex: "-1" }}>
+        <ThreeShapes />
+      </div>
+      <div className="auth-container">
+>>>>>>> cb95865671dc2bf6815f3d6013f206399c4b96a0
         <h1 className="auth-title">Login</h1>
         <form onSubmit={handleLogin} className="auth-form">
           <div className="input-group">

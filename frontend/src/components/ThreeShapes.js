@@ -124,8 +124,4 @@ const ThreeShapes = () => {
   );
 };
 
-<<<<<<< HEAD
 export default ThreeShapes;
-=======
-export default ThreeShapes;
->>>>>>> cb95865671dc2bf6815f3d6013f206399c4b96a0

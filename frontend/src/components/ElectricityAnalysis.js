@@ -51,9 +51,13 @@ const ElectricityAnalysis = ({ setElectricityData, handleFilePathChange }) => {
     formData.append("dataset", file);
 
     try {
-      const response = await axios.post("http://localhost:8080/dataset/upload/electricity", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await axios.post(
+        "http://localhost:8080/dataset/upload/electricity",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
       console.log("Upload response:", response.data);
 
       if (response.data.success) {
@@ -64,11 +68,17 @@ const ElectricityAnalysis = ({ setElectricityData, handleFilePathChange }) => {
           return;
         }
         const labels = Object.keys(jsonData);
-        const timestamp = labels.map((day) => new Date(jsonData[day].timestamp).toLocaleString());
-        const totalElectricity = labels.map((day) => jsonData[day].electricityUsage);
+        const timestamp = labels.map((day) =>
+          new Date(jsonData[day].timestamp).toLocaleString()
+        );
+        const totalElectricity = labels.map(
+          (day) => jsonData[day].electricityUsage
+        );
         const fan = labels.map((day) => jsonData[day].fan);
         const refrigerator = labels.map((day) => jsonData[day].refrigerator);
-        const washingMachine = labels.map((day) => jsonData[day].washingMachine);
+        const washingMachine = labels.map(
+          (day) => jsonData[day].washingMachine
+        );
         const heater = labels.map((day) => jsonData[day].heater);
         const lights = labels.map((day) => jsonData[day].lights);
 
@@ -177,7 +187,8 @@ const ElectricityAnalysis = ({ setElectricityData, handleFilePathChange }) => {
         });
 
         const maxElectricityUsage = Math.max(...totalElectricity);
-        const maxElectricityUsageIndex = totalElectricity.indexOf(maxElectricityUsage);
+        const maxElectricityUsageIndex =
+          totalElectricity.indexOf(maxElectricityUsage);
         const maxElectricityUsageDate = labels[maxElectricityUsageIndex];
 
         const maxFanUsage = Math.max(...fan);
@@ -185,11 +196,14 @@ const ElectricityAnalysis = ({ setElectricityData, handleFilePathChange }) => {
         const maxFanUsageDate = labels[maxFanUsageIndex];
 
         const maxRefrigeratorUsage = Math.max(...refrigerator);
-        const maxRefrigeratorUsageIndex = refrigerator.indexOf(maxRefrigeratorUsage);
+        const maxRefrigeratorUsageIndex =
+          refrigerator.indexOf(maxRefrigeratorUsage);
         const maxRefrigeratorUsageDate = labels[maxRefrigeratorUsageIndex];
 
         const maxWashingMachineUsage = Math.max(...washingMachine);
-        const maxWashingMachineUsageIndex = washingMachine.indexOf(maxWashingMachineUsage);
+        const maxWashingMachineUsageIndex = washingMachine.indexOf(
+          maxWashingMachineUsage
+        );
         const maxWashingMachineUsageDate = labels[maxWashingMachineUsageIndex];
 
         const maxHeaterUsage = Math.max(...heater);
@@ -200,17 +214,31 @@ const ElectricityAnalysis = ({ setElectricityData, handleFilePathChange }) => {
         const maxLightsUsageIndex = lights.indexOf(maxLightsUsage);
         const maxLightsUsageDate = labels[maxLightsUsageIndex];
 
-        const averageElectricityUsage = totalElectricity.reduce((a, b) => a + b, 0) / totalElectricity.length;
+        const averageElectricityUsage =
+          totalElectricity.reduce((a, b) => a + b, 0) / totalElectricity.length;
         const averageFanUsage = fan.reduce((a, b) => a + b, 0) / fan.length;
-        const averageRefrigeratorUsage = refrigerator.reduce((a, b) => a + b, 0) / refrigerator.length;
-        const averageWashingMachineUsage = washingMachine.reduce((a, b) => a + b, 0) / washingMachine.length;
-        const averageHeaterUsage = heater.reduce((a, b) => a + b, 0) / heater.length;
-        const averageLightsUsage = lights.reduce((a, b) => a + b, 0) / lights.length;
+        const averageRefrigeratorUsage =
+          refrigerator.reduce((a, b) => a + b, 0) / refrigerator.length;
+        const averageWashingMachineUsage =
+          washingMachine.reduce((a, b) => a + b, 0) / washingMachine.length;
+        const averageHeaterUsage =
+          heater.reduce((a, b) => a + b, 0) / heater.length;
+        const averageLightsUsage =
+          lights.reduce((a, b) => a + b, 0) / lights.length;
 
-        const totalElectricityConsumption = totalElectricity.reduce((a, b) => a + b, 0);
+        const totalElectricityConsumption = totalElectricity.reduce(
+          (a, b) => a + b,
+          0
+        );
         const totalFanConsumption = fan.reduce((a, b) => a + b, 0);
-        const totalRefrigeratorConsumption = refrigerator.reduce((a, b) => a + b, 0);
-        const totalWashingMachineConsumption = washingMachine.reduce((a, b) => a + b, 0);
+        const totalRefrigeratorConsumption = refrigerator.reduce(
+          (a, b) => a + b,
+          0
+        );
+        const totalWashingMachineConsumption = washingMachine.reduce(
+          (a, b) => a + b,
+          0
+        );
         const totalHeaterConsumption = heater.reduce((a, b) => a + b, 0);
         const totalLightsConsumption = lights.reduce((a, b) => a + b, 0);
 
@@ -259,140 +287,134 @@ const ElectricityAnalysis = ({ setElectricityData, handleFilePathChange }) => {
   };
 
   return (
-    <div className="dashboard-container">
+    <div className="electricity-analysis-container">
       <h1>Electricity Analysis</h1>
-      <input type="file" onChange={handleFileChange} />
-      <button onClick={handleUpload}>Upload & Analyze</button>
+      <div className="btn-dflex">
+        <input type="file" className="file-uplod" onChange={handleFileChange} />
+        <button className="file-upload-button" onClick={handleUpload}>
+          Upload & Analyze
+        </button>
+      </div>
       {chartData && (
-        <div className="graph-row">
-          <div className="graph-container">
-            <h2>Electricity Usage Analysis</h2>
-            <p>This graph shows the total electricity usage over time.</p>
-            <Bar key={JSON.stringify(chartData)} data={chartData} />
+        <div className="electricity-analysis-graph">
+          <div className="first-row" style={{ display: "flex" }}>
+            <div style={{ width: "50%" }}>
+              <div className="inner-row">
+                <h3>Electricity Usage Analysis</h3>
+                <p>This graph shows the total electricity usage over time.</p>
+                <Bar key={JSON.stringify(chartData)} data={chartData} />
+              </div>
+            </div>
+            <div style={{ width: "50%" }}>
+              <div className="inner-row">
+                <h3>Timestamp Analysis</h3>
+                <p>This graph shows the timestamp of each data point.</p>
+                <Line
+                  key={JSON.stringify(timestampData)}
+                  data={timestampData}
+                />
+              </div>
+            </div>
           </div>
-          <div className="graph-container">
-            <h2>Timestamp Analysis</h2>
-            <p>This graph shows the timestamp of each data point.</p>
-            <Line key={JSON.stringify(timestampData)} data={timestampData} />
+          <div className="second-row" style={{ display: "flex" }}>
+            <div style={{ width: "50%" }}>
+              <div className="inner-row">
+                <h3>Total Electricity Analysis</h3>
+                <p>This graph shows the total electricity usage over time.</p>
+                <Bar
+                  key={JSON.stringify(totalElectricityData)}
+                  data={totalElectricityData}
+                />
+              </div>
+            </div>
+            <div style={{ width: "50%" }}>
+              <div className="inner-row">
+                <h3>Fan Analysis</h3>
+                <p>
+                  This graph shows the electricity usage of the fan over time.
+                </p>
+                <Bar key={JSON.stringify(fanData)} data={fanData} />
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-      {totalElectricityData && (
-        <div className="graph-row">
-          <div className="graph-container">
-            <h2>Total Electricity Analysis</h2>
-            <p>This graph shows the total electricity usage over time.</p>
-            <Bar key={JSON.stringify(totalElectricityData)} data={totalElectricityData} />
+          <div className="third-row" style={{ display: "flex" }}>
+            <div style={{ width: "50%" }}>
+              <div className="inner-row">
+                <h3>Refrigerator Analysis</h3>
+                <p>
+                  This graph shows the electricity usage of the refrigerator
+                  over time.
+                </p>
+                <Bar
+                  key={JSON.stringify(refrigeratorData)}
+                  data={refrigeratorData}
+                />
+              </div>
+            </div>
+            <div style={{ width: "50%" }}>
+              <div className="inner-row">
+                <h3>Washing Machine Analysis</h3>
+                <p>
+                  This graph shows the electricity usage of the washing machine
+                  over time.
+                </p>
+                <Bar
+                  key={JSON.stringify(washingMachineData)}
+                  data={washingMachineData}
+                />
+              </div>
+            </div>
           </div>
-          <div className="graph-container">
-            <h2>Fan Analysis</h2>
-            <p>This graph shows the electricity usage of the fan over time.</p>
-            <Bar key={JSON.stringify(fanData)} data={fanData} />
+          <div className="fourth-row" style={{ display: "flex" }}>
+            <div style={{ width: "50%" }}>
+              <div className="inner-row">
+                <h3>Heater Analysis</h3>
+                <p>
+                  This graph shows the electricity usage of the heater over
+                  time.
+                </p>
+                <Bar key={JSON.stringify(heaterData)} data={heaterData} />
+              </div>
+            </div>
+            <div style={{ width: "50%" }}>
+              <div className="inner-row">
+                <h3>Lights Analysis</h3>
+                <p>
+                  This graph shows the electricity usage of the lights over
+                  time.
+                </p>
+                <Bar key={JSON.stringify(lightsData)} data={lightsData} />
+              </div>
+            </div>
           </div>
-        </div>
-      )}
-      {refrigeratorData && (
-        <div className="graph-row">
-          <div className="graph-container">
-            <h2>Refrigerator Analysis</h2>
-            <p>This graph shows the electricity usage of the refrigerator over time.</p>
-            <Bar key={JSON.stringify(refrigeratorData)} data={refrigeratorData} />
-          </div>
-          <div className="graph-container">
-            <h2>Washing Machine Analysis</h2>
-            <p>This graph shows the electricity usage of the washing machine over time.</p>
-            <Bar key={JSON.stringify(washingMachineData)} data={washingMachineData} />
-          </div>
-        </div>
-      )}
-      {heaterData && (
-        <div className="graph-row">
-          <div className="graph-container">
-            <h2>Heater Analysis</h2>
-            <p>This graph shows the electricity usage of the heater over time.</p>
-            <Bar key={JSON.stringify(heaterData)} data={heaterData} />
-          </div>
-          <div className="graph-container">
-            <h2>Lights Analysis</h2>
-            <p>This graph shows the electricity usage of the lights over time.</p>
-            <Bar key={JSON.stringify(lightsData)} data={lightsData} />
-          </div>
-        </div>
-      )}
-      {analysis && (
-        <div className="analysis-box">
-          <h2>Analysis</h2>
-          <div className="analysis-card">
-            <h3>Max Electricity Usage</h3>
-            <p>{analysis.maxElectricityUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Max Fan Usage</h3>
-            <p>{analysis.maxFanUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Max Refrigerator Usage</h3>
-            <p>{analysis.maxRefrigeratorUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Max Washing Machine Usage</h3>
-            <p>{analysis.maxWashingMachineUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Max Heater Usage</h3>
-            <p>{analysis.maxHeaterUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Max Lights Usage</h3>
-            <p>{analysis.maxLightsUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Average Electricity Usage</h3>
-            <p>{analysis.averageElectricityUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Average Fan Usage</h3>
-            <p>{analysis.averageFanUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Average Refrigerator Usage</h3>
-            <p>{analysis.averageRefrigeratorUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Average Washing Machine Usage</h3>
-            <p>{analysis.averageWashingMachineUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Average Heater Usage</h3>
-            <p>{analysis.averageHeaterUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Average Lights Usage</h3>
-            <p>{analysis.averageLightsUsage}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Total Electricity Consumption</h3>
-            <p>{analysis.totalElectricityConsumption}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Total Fan Consumption</h3>
-            <p>{analysis.totalFanConsumption}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Total Refrigerator Consumption</h3>
-            <p>{analysis.totalRefrigeratorConsumption}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Total Washing Machine Consumption</h3>
-            <p>{analysis.totalWashingMachineConsumption}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Total Heater Consumption</h3>
-            <p>{analysis.totalHeaterConsumption}</p>
-          </div>
-          <div className="analysis-card">
-            <h3>Total Lights Consumption</h3>
-            <p>{analysis.totalLightsConsumption}</p>
+          <div className="summary-row" style={{ display: "flex" }}>
+            <div style={{ width: "50%" }}>
+              <div className="inner-row">
+                <h3>Summary</h3>
+                {analysis && (
+                  <div>
+                    <p>{analysis.maxElectricityUsage}</p>
+                    <p>{analysis.maxFanUsage}</p>
+                    <p>{analysis.maxRefrigeratorUsage}</p>
+                    <p>{analysis.maxWashingMachineUsage}</p>
+                    <p>{analysis.maxHeaterUsage}</p>
+                    <p>{analysis.maxLightsUsage}</p>
+                    <p>{analysis.averageElectricityUsage}</p>
+                    <p>{analysis.averageFanUsage}</p>
+                    <p>{analysis.averageRefrigeratorUsage}</p>
+                    <p>{analysis.averageWashingMachineUsage}</p>
+                    <p>{analysis.averageHeaterUsage}</p>
+                    <p>{analysis.averageLightsUsage}</p>
+                    <p>{analysis.totalElectricityConsumption}</p>
+                    <p>{analysis.totalFanConsumption}</p>
+                    <p>{analysis.totalRefrigeratorConsumption}</p>
+                    <p>{analysis.totalWashingMachineConsumption}</p>
+                    <p>{analysis.totalHeaterConsumption}</p>
+                    <p>{analysis.totalLightsConsumption}</p>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}

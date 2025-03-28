@@ -34,23 +34,23 @@ const Dashboard = () => {
 
   return (
     <div className="dashboard-container">
-      <h1>Welcome to Dashboard</h1>
-      <button onClick={handleLogout} className="logout-button">Logout</button>
-      <button onClick={handleBack} className="back-button">Back</button>
-
+      <header className="header_dashboard">
+        <div className="header-container">
+          <h1 className="header-text">Welcome to Dashboard</h1>
+          <button className="logout-button" onClick={handleLogout}>Logout</button>
+        </div>
+      </header>
       <div className="option-container">
-        <button onClick={() => handleOptionChange("water")}>Water</button>
-        <button onClick={() => handleOptionChange("electricity")}>Electricity</button>
+        <button className="option-button" onClick={() => handleOptionChange("water")}>Water</button>
+        <button className="option-button" onClick={() => handleOptionChange("electricity")}>Electricity</button>
       </div>
-
       {selectedOption === "water" && (
         <WaterAnalysis setWaterData={setWaterData} />
       )}
-
       {selectedOption === "electricity" && (
         <ElectricityAnalysis setElectricityData={setElectricityData} handleFilePathChange={handleFilePathChange} />
       )}
-      {waterData && (
+      {/* {waterData && (
         <div className="graph-container">
           <h2>Water Usage Analysis</h2>
           {waterData.labels && waterData.datasets && (
@@ -70,7 +70,6 @@ const Dashboard = () => {
           )}
         </div>
       )}
-
       {electricityData && (
         <div className="graph-container">
           <h2>Electricity Usage Analysis</h2>
@@ -88,10 +87,9 @@ const Dashboard = () => {
           <h2>Electricity Consumption by Time of Day</h2>
           {electricityData.labels && electricityData.datasets && (
             <Bar data={electricityData} />
-          )}
-        </div>
-      )}
-
+          )} */}
+        {/* </div> */}
+      {/* )} */}
       <ToastContainer />
     </div>
   );

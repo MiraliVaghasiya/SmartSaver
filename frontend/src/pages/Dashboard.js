@@ -1,3 +1,4 @@
+// In your Dashboard component
 import React, { useState, useEffect } from "react";
 import WaterAnalysis from "../components/WaterAnalysis";
 import ElectricityAnalysis from "../components/ElectricityAnalysis";
@@ -10,6 +11,13 @@ const Dashboard = () => {
   const [electricityData, setElectricityData] = useState(null);
   const [selectedOption, setSelectedOption] = useState(null);
   const [selectedFilePath, setSelectedFilePath] = useState(null);
+
+  useEffect(() => {
+    const storedFilePath = localStorage.getItem("electricityFilePath");
+    if (storedFilePath) {
+      setSelectedFilePath(storedFilePath);
+    }
+  }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -36,7 +44,7 @@ const Dashboard = () => {
     <div className="dashboard-container">
       <header className="header_dashboard">
         <div className="header-container">
-          <h1 className="header-text">Welcome to Dashboard</h1>
+          <h1 className="header-text">SmartSaver Dashboard</h1>
           <button className="logout-button" onClick={handleLogout}>
             Logout
           </button>
@@ -63,6 +71,7 @@ const Dashboard = () => {
         <ElectricityAnalysis
           setElectricityData={setElectricityData}
           handleFilePathChange={handleFilePathChange}
+          selectedFilePath={selectedFilePath}
         />
       )}
 

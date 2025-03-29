@@ -69,7 +69,6 @@ router.post("/upload/water", upload.single("dataset"), async (req, res) => {
     }
 
     const analysis = analyzeWaterUsage(data);
-    console.log("File uploaded successfully:", req.file.path);
     res.json({
       success: true,
       usagePerDay: analysis.usagePerDay,
@@ -110,7 +109,6 @@ router.post(
       }
 
       const analysis = analyzeElectricityUsage(data);
-      console.log("File uploaded successfully:", req.file.path);
       res.json({
         success: true,
         usagePerDay: analysis.usagePerDay,

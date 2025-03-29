@@ -25,7 +25,7 @@ ChartJS.register(
   Legend
 );
 
-const ElectricityAnalysis = ({ setElectricityData, handleFilePathChange }) => {
+const ElectricityAnalysis = () => {
   const [file, setFile] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [timestampData, setTimestampData] = useState(null);
@@ -262,21 +262,6 @@ const ElectricityAnalysis = ({ setElectricityData, handleFilePathChange }) => {
           totalHeaterConsumption: `Total heater consumption : ${totalHeaterConsumption} kWh.`,
           totalLightsConsumption: `Total lights consumption : ${totalLightsConsumption} kWh.`,
         });
-
-        setElectricityData({
-          labels,
-          datasets: [
-            {
-              label: "Electricity Usage (kWh)",
-              data: totalElectricity,
-              backgroundColor: "rgba(255, 99, 132, 0.2)",
-              borderColor: "rgba(255, 99, 132, 1)",
-              borderWidth: 1,
-            },
-          ],
-        });
-
-        handleFilePathChange(file.name);
       } else {
         throw new Error("Upload failed.");
       }
@@ -307,16 +292,51 @@ const ElectricityAnalysis = ({ setElectricityData, handleFilePathChange }) => {
               <Bar key={JSON.stringify(chartData)} data={chartData} />
             </div>
           </div>
-          <div style={{ width: "50%" }}>
-            <div className="inner-row">
-              <h3>Total Electricity Analysis</h3>
-              <p>This graph shows the total electricity usage over time.</p>
-              <Bar
-                key={JSON.stringify(totalElectricityData)}
-                data={totalElectricityData}
-              />
-            </div>
-          </div>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+          
           <div style={{ width: "50%" }}>
             <div className="inner-row">
               <h3>Fan Analysis</h3>

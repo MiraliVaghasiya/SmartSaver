@@ -34,7 +34,11 @@ const upload = multer({
 
     if (!allowedExtensions.includes(ext)) {
       console.error("Unsupported file type:", file.originalname);
-      return cb(new Error("Unsupported file type. Please upload a CSV, TXT, or XLSX file."));
+      return cb(
+        new Error(
+          "Unsupported file type. Please upload a CSV, TXT, or XLSX file."
+        )
+      );
     }
 
     cb(null, true);
@@ -65,45 +69,61 @@ router.post("/upload/water", upload.single("dataset"), async (req, res) => {
     }
 
     const analysis = analyzeWaterUsage(data);
-    console.log("File uploaded successfully:", req.file.path)
-    res.json({ success: true, usagePerDay: analysis.usagePerDay, summary: analysis });
+    console.log("File uploaded successfully:", req.file.path);
+    res.json({
+      success: true,
+      usagePerDay: analysis.usagePerDay,
+      summary: analysis,
+    });
   } catch (error) {
     console.error("Upload Error:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error", error });
+    res
+      .status(500)
+      .json({ success: false, message: "Internal Server Error", error });
   }
 });
 
-router.post("/upload/electricity", upload.single("dataset"), async (req, res) => {
-  try {
-    if (!req.file) {
-      console.error("File upload failed!");
-      return res.status(400).json({ error: "No file uploaded" });
+router.post(
+  "/upload/electricity",
+  upload.single("dataset"),
+  async (req, res) => {
+    try {
+      if (!req.file) {
+        console.error("File upload failed!");
+        return res.status(400).json({ error: "No file uploaded" });
+      }
+
+      console.log("File uploaded successfully:", req.file);
+
+      const filePath = req.file.path;
+      const fileExt = path.extname(req.file.originalname).toLowerCase();
+      let data = [];
+
+      if (fileExt === ".csv") {
+        data = await processCSVFile(filePath);
+      } else if (fileExt === ".txt") {
+        data = await processCSVFile(filePath);
+      } else if (fileExt === ".xlsx") {
+        data = await processXLSXFile(filePath);
+      } else {
+        return res.status(400).json({ error: "Unsupported file format" });
+      }
+
+      const analysis = analyzeElectricityUsage(data);
+      console.log("File uploaded successfully:", req.file.path);
+      res.json({
+        success: true,
+        usagePerDay: analysis.usagePerDay,
+        summary: analysis,
+      });
+    } catch (error) {
+      console.error("Upload Error:", error);
+      res
+        .status(500)
+        .json({ success: false, message: "Internal Server Error", error });
     }
-
-    console.log("File uploaded successfully:", req.file);
-
-    const filePath = req.file.path;
-    const fileExt = path.extname(req.file.originalname).toLowerCase();
-    let data = [];
-
-    if (fileExt === ".csv") {
-      data = await processCSVFile(filePath);
-    } else if (fileExt === ".txt") {
-      data = await processCSVFile(filePath);
-    } else if (fileExt === ".xlsx") {
-      data = await processXLSXFile(filePath);
-    } else {
-      return res.status(400).json({ error: "Unsupported file format" });
-    }
-
-    const analysis = analyzeElectricityUsage(data);
-    console.log("File uploaded successfully:", req.file.path)
-    res.json({ success: true, usagePerDay: analysis.usagePerDay, summary: analysis });
-  } catch (error) {
-    console.error("Upload Error:", error);
-    res.status(500).json({ success: false, message: "Internal Server Error", error });
   }
-});
+);
 
 // Function to process CSV/TXT file
 function processCSVFile(filePath) {
@@ -201,10 +221,22 @@ function analyzeWaterUsage(data) {
   // Find the day with the most water usage for each activity
   const mostWaterUsageDays = {};
   Object.keys(usagePerDay).forEach((date) => {
-    const activities = ["drinking", "cooking", "bathing", "washingClothes", "dishwashing"];
+    const activities = [
+      "drinking",
+      "cooking",
+      "bathing",
+      "washingClothes",
+      "dishwashing",
+    ];
     activities.forEach((activity) => {
-      if (!mostWaterUsageDays[activity] || usagePerDay[date][activity] > mostWaterUsageDays[activity].usage) {
-        mostWaterUsageDays[activity] = { date, usage: usagePerDay[date][activity] };
+      if (
+        !mostWaterUsageDays[activity] ||
+        usagePerDay[date][activity] > mostWaterUsageDays[activity].usage
+      ) {
+        mostWaterUsageDays[activity] = {
+          date,
+          usage: usagePerDay[date][activity],
+        };
       }
     });
   });
@@ -212,10 +244,14 @@ function analyzeWaterUsage(data) {
   // Provide suggestions to the user
   const suggestions = [];
   if (averageWaterUsage > 100) {
-    suggestions.push("Consider reducing your water usage by using water-efficient appliances.");
+    suggestions.push(
+      "Consider reducing your water usage by using water-efficient appliances."
+    );
   }
   if (maxWaterUsage > 200) {
-    suggestions.push("Consider installing a smart meter to monitor your water usage in real-time.");
+    suggestions.push(
+      "Consider installing a smart meter to monitor your water usage in real-time."
+    );
   }
 
   // Calculate the day with the most water usage for each activity
@@ -227,7 +263,13 @@ function analyzeWaterUsage(data) {
   // Calculate the total water usage for each activity
   const totalWaterUsageByActivity = {};
   Object.keys(usagePerDay).forEach((date) => {
-    const activities = ["drinking", "cooking", "bathing", "washingClothes", "dishwashing"];
+    const activities = [
+      "drinking",
+      "cooking",
+      "bathing",
+      "washingClothes",
+      "dishwashing",
+    ];
     activities.forEach((activity) => {
       if (!totalWaterUsageByActivity[activity]) {
         totalWaterUsageByActivity[activity] = 0;
@@ -239,7 +281,8 @@ function analyzeWaterUsage(data) {
   // Calculate the percentage of water usage for each activity
   const percentageWaterUsageByActivity = {};
   Object.keys(totalWaterUsageByActivity).forEach((activity) => {
-    percentageWaterUsageByActivity[activity] = (totalWaterUsageByActivity[activity] / totalWaterUsage) * 100;
+    percentageWaterUsageByActivity[activity] =
+      (totalWaterUsageByActivity[activity] / totalWaterUsage) * 100;
   });
 
   return {
@@ -266,7 +309,9 @@ function getWeekNumber(date) {
   const day = parseInt(dateParts[2]);
   const dateObject = new Date(year, month - 1, day);
   const firstDayOfYear = new Date(year, 0, 1);
-  const daysSinceFirstDayOfYear = Math.floor((dateObject - firstDayOfYear) / (24 * 60 * 60 * 1000));
+  const daysSinceFirstDayOfYear = Math.floor(
+    (dateObject - firstDayOfYear) / (24 * 60 * 60 * 1000)
+  );
   return Math.ceil((daysSinceFirstDayOfYear + firstDayOfYear.getDay() + 1) / 7);
 }
 
@@ -325,15 +370,20 @@ function analyzeElectricityUsage(data) {
   });
 
   // Calculate average electricity usage per day
-  const averageElectricityUsage = totalElectricityUsage / Object.keys(usagePerDay).length;
+  const averageElectricityUsage =
+    totalElectricityUsage / Object.keys(usagePerDay).length;
 
   // Provide suggestions to the user
   const suggestions = [];
   if (averageElectricityUsage > 10) {
-    suggestions.push("Consider reducing your electricity usage by using energy-efficient appliances.");
+    suggestions.push(
+      "Consider reducing your electricity usage by using energy-efficient appliances."
+    );
   }
   if (maxElectricityUsage > 20) {
-    suggestions.push("Consider installing a smart meter to monitor your electricity usage in real-time.");
+    suggestions.push(
+      "Consider installing a smart meter to monitor your electricity usage in real-time."
+    );
   }
 
   return {
@@ -345,6 +395,5 @@ function analyzeElectricityUsage(data) {
     suggestions,
   };
 }
-
 
 module.exports = router;

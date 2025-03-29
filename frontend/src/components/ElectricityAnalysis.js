@@ -296,124 +296,105 @@ const ElectricityAnalysis = ({ setElectricityData, handleFilePathChange }) => {
         </button>
       </div>
       {chartData && (
-        <div className="electricity-analysis-graph">
-          <div className="first-row" style={{ display: "flex" }}>
-            <div style={{ width: "50%" }}>
-              <div className="inner-row">
-                <h3>Electricity Usage Analysis</h3>
-                <p>This graph shows the total electricity usage over time.</p>
-                <Bar key={JSON.stringify(chartData)} data={chartData} />
-              </div>
-            </div>
-            <div style={{ width: "50%" }}>
-              <div className="inner-row">
-                <h3>Timestamp Analysis</h3>
-                <p>This graph shows the timestamp of each data point.</p>
-                <Line
-                  key={JSON.stringify(timestampData)}
-                  data={timestampData}
-                />
-              </div>
+        <div
+          className="electricity-analysis-graph"
+          style={{ display: "flex", flexWrap: "wrap" }}
+        >
+          <div style={{ width: "50%" }}>
+            <div className="inner-row">
+              <h3>Electricity Usage Analysis</h3>
+              <p>This graph shows the total electricity usage over time.</p>
+              <Bar key={JSON.stringify(chartData)} data={chartData} />
             </div>
           </div>
-          <div className="second-row" style={{ display: "flex" }}>
-            <div style={{ width: "50%" }}>
-              <div className="inner-row">
-                <h3>Total Electricity Analysis</h3>
-                <p>This graph shows the total electricity usage over time.</p>
-                <Bar
-                  key={JSON.stringify(totalElectricityData)}
-                  data={totalElectricityData}
-                />
-              </div>
-            </div>
-            <div style={{ width: "50%" }}>
-              <div className="inner-row">
-                <h3>Fan Analysis</h3>
-                <p>
-                  This graph shows the electricity usage of the fan over time.
-                </p>
-                <Bar key={JSON.stringify(fanData)} data={fanData} />
-              </div>
+          <div style={{ width: "50%" }}>
+            <div className="inner-row">
+              <h3>Total Electricity Analysis</h3>
+              <p>This graph shows the total electricity usage over time.</p>
+              <Bar
+                key={JSON.stringify(totalElectricityData)}
+                data={totalElectricityData}
+              />
             </div>
           </div>
-          <div className="third-row" style={{ display: "flex" }}>
-            <div style={{ width: "50%" }}>
-              <div className="inner-row">
-                <h3>Refrigerator Analysis</h3>
-                <p>
-                  This graph shows the electricity usage of the refrigerator
-                  over time.
-                </p>
-                <Bar
-                  key={JSON.stringify(refrigeratorData)}
-                  data={refrigeratorData}
-                />
-              </div>
-            </div>
-            <div style={{ width: "50%" }}>
-              <div className="inner-row">
-                <h3>Washing Machine Analysis</h3>
-                <p>
-                  This graph shows the electricity usage of the washing machine
-                  over time.
-                </p>
-                <Bar
-                  key={JSON.stringify(washingMachineData)}
-                  data={washingMachineData}
-                />
-              </div>
+          <div style={{ width: "50%" }}>
+            <div className="inner-row">
+              <h3>Fan Analysis</h3>
+              <p>
+                This graph shows the electricity usage of the fan over time.
+              </p>
+              <Bar key={JSON.stringify(fanData)} data={fanData} />
             </div>
           </div>
-          <div className="fourth-row" style={{ display: "flex" }}>
-            <div style={{ width: "50%" }}>
-              <div className="inner-row">
-                <h3>Heater Analysis</h3>
-                <p>
-                  This graph shows the electricity usage of the heater over
-                  time.
-                </p>
-                <Bar key={JSON.stringify(heaterData)} data={heaterData} />
-              </div>
-            </div>
-            <div style={{ width: "50%" }}>
-              <div className="inner-row">
-                <h3>Lights Analysis</h3>
-                <p>
-                  This graph shows the electricity usage of the lights over
-                  time.
-                </p>
-                <Bar key={JSON.stringify(lightsData)} data={lightsData} />
-              </div>
+          <div style={{ width: "50%" }}>
+            <div className="inner-row">
+              <h3>Refrigerator Analysis</h3>
+              <p>
+                This graph shows the electricity usage of the refrigerator over
+                time.
+              </p>
+              <Bar
+                key={JSON.stringify(refrigeratorData)}
+                data={refrigeratorData}
+              />
             </div>
           </div>
-          <div className="summary-row" style={{ display: "flex" }}>
-            <div style={{ width: "50%" }}>
-              <div className="inner-row">
-                <h3>Summary</h3>
-                {analysis && (
-                  <div>
-                    <p>{analysis.maxElectricityUsage}</p>
-                    <p>{analysis.maxFanUsage}</p>
-                    <p>{analysis.maxRefrigeratorUsage}</p>
-                    <p>{analysis.maxWashingMachineUsage}</p>
-                    <p>{analysis.maxHeaterUsage}</p>
-                    <p>{analysis.maxLightsUsage}</p>
-                    <p>{analysis.averageElectricityUsage}</p>
-                    <p>{analysis.averageFanUsage}</p>
-                    <p>{analysis.averageRefrigeratorUsage}</p>
-                    <p>{analysis.averageWashingMachineUsage}</p>
-                    <p>{analysis.averageHeaterUsage}</p>
-                    <p>{analysis.averageLightsUsage}</p>
-                    <p>{analysis.totalElectricityConsumption}</p>
-                    <p>{analysis.totalFanConsumption}</p>
-                    <p>{analysis.totalRefrigeratorConsumption}</p>
-                    <p>{analysis.totalWashingMachineConsumption}</p>
-                    <p>{analysis.totalHeaterConsumption}</p>
-                    <p>{analysis.totalLightsConsumption}</p>
-                  </div>
-                )}
-              </div>
+          <div style={{ width: "50%" }}>
+            <div className="inner-row">
+              <h3>Washing Machine Analysis</h3>
+              <p>
+                This graph shows the electricity usage of the washing machine
+                over time.
+              </p>
+              <Bar
+                key={JSON.stringify(washingMachineData)}
+                data={washingMachineData}
+              />
+            </div>
+          </div>
+          <div style={{ width: "50%" }}>
+            <div className="inner-row">
+              <h3>Heater Analysis</h3>
+              <p>
+                This graph shows the electricity usage of the heater over time.
+              </p>
+              <Bar key={JSON.stringify(heaterData)} data={heaterData} />
+            </div>
+          </div>
+          <div style={{ width: "50%" }}>
+            <div className="inner-row">
+              <h3>Lights Analysis</h3>
+              <p>
+                This graph shows the electricity usage of the lights over time.
+              </p>
+              <Bar key={JSON.stringify(lightsData)} data={lightsData} />
+            </div>
+          </div>
+          <div style={{ width: "100%" }} className="summary">
+            <div className="inner-row">
+              <h3>Summary</h3>
+              {analysis && (
+                <div>
+                  <p>{analysis.maxElectricityUsage}</p>
+                  <p>{analysis.maxFanUsage}</p>
+                  <p>{analysis.maxRefrigeratorUsage}</p>
+                  <p>{analysis.maxWashingMachineUsage}</p>
+                  <p>{analysis.maxHeaterUsage}</p>
+                  <p>{analysis.maxLightsUsage}</p>
+                  <p>{analysis.averageElectricityUsage}</p>
+                  <p>{analysis.averageFanUsage}</p>
+                  <p>{analysis.averageRefrigeratorUsage}</p>
+                  <p>{analysis.averageWashingMachineUsage}</p>
+                  <p>{analysis.averageHeaterUsage}</p>
+                  <p>{analysis.averageLightsUsage}</p>
+                  <p>{analysis.totalElectricityConsumption}</p>
+                  <p>{analysis.totalFanConsumption}</p>
+                  <p>{analysis.totalRefrigeratorConsumption}</p>
+                  <p>{analysis.totalWashingMachineConsumption}</p>
+                  <p>{analysis.totalHeaterConsumption}</p>
+                  <p>{analysis.totalLightsConsumption}</p>
+                </div>
+              )}
             </div>
           </div>
         </div>

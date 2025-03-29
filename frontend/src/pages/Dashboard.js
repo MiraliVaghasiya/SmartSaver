@@ -37,59 +37,35 @@ const Dashboard = () => {
       <header className="header_dashboard">
         <div className="header-container">
           <h1 className="header-text">Welcome to Dashboard</h1>
-          <button className="logout-button" onClick={handleLogout}>Logout</button>
+          <button className="logout-button" onClick={handleLogout}>
+            Logout
+          </button>
         </div>
       </header>
       <div className="option-container">
-        <button className="option-button" onClick={() => handleOptionChange("water")}>Water</button>
-        <button className="option-button" onClick={() => handleOptionChange("electricity")}>Electricity</button>
+        <button
+          className="option-button"
+          onClick={() => handleOptionChange("water")}
+        >
+          Water
+        </button>
+        <button
+          className="option-button"
+          onClick={() => handleOptionChange("electricity")}
+        >
+          Electricity
+        </button>
       </div>
       {selectedOption === "water" && (
         <WaterAnalysis setWaterData={setWaterData} />
       )}
       {selectedOption === "electricity" && (
-        <ElectricityAnalysis setElectricityData={setElectricityData} handleFilePathChange={handleFilePathChange} />
+        <ElectricityAnalysis
+          setElectricityData={setElectricityData}
+          handleFilePathChange={handleFilePathChange}
+        />
       )}
-      {/* {waterData && (
-        <div className="graph-container">
-          <h2>Water Usage Analysis</h2>
-          {waterData.labels && waterData.datasets && (
-            <Bar data={waterData} />
-          )}
-          <h2>Water Consumption by Activity</h2>
-          {waterData.labels && waterData.datasets && (
-            <Bar data={waterData} />
-          )}
-          <h2>Water Usage by Day</h2>
-          {waterData.labels && waterData.datasets && (
-            <Line data={waterData} />
-          )}
-          <h2>Water Consumption by Appliance</h2>
-          {waterData.labels && waterData.datasets && (
-            <Bar data={waterData} />
-          )}
-        </div>
-      )}
-      {electricityData && (
-        <div className="graph-container">
-          <h2>Electricity Usage Analysis</h2>
-          {electricityData.labels && electricityData.datasets && (
-            <Bar data={electricityData} />
-          )}
-          <h2>Electricity Consumption by Appliance</h2>
-          {electricityData.labels && electricityData.datasets && (
-            <Bar data={electricityData} />
-          )}
-          <h2>Electricity Usage by Day</h2>
-          {electricityData.labels && electricityData.datasets && (
-            <Line data={electricityData} />
-          )}
-          <h2>Electricity Consumption by Time of Day</h2>
-          {electricityData.labels && electricityData.datasets && (
-            <Bar data={electricityData} />
-          )} */}
-        {/* </div> */}
-      {/* )} */}
+
       <ToastContainer />
     </div>
   );

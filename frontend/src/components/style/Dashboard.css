@@ -188,6 +188,6 @@ flex-wrap: wrap;
 .summary p {
   margin-bottom: 5px;
 }
-.electricity-analysis-graph .summary-row .inner-row {
-  height: 100%;
+.electricity-analysis-container .summary .inner-row  {
+  height: 100% !important;
 }

@@ -1,25 +1,37 @@
-const mongoose = require('mongoose');
-const schema = mongoose.Schema;
+const mongoose = require("mongoose");
 
-const userschema = new schema({
-    name: {
+// Check if the model already exists
+const User =
+  mongoose.models.User ||
+  mongoose.model(
+    "User",
+    new mongoose.Schema({
+      name: {
         type: String,
         required: true,
-    },
-    email: {
+      },
+      email: {
         type: String,
         required: true,
         unique: true,
-    },
-    password: {
+      },
+      password: {
         type: String,
-    },
-    googleId: {  // ✅ New field for Google authentication
+        required: function() {
+          return !this.googleId; // Password is only required if not using Google auth
+        }
+      },
+      googleId: {
+        // ✅ New field for Google authentication
         type: String,
         unique: true,
-        sparse: true,  // ✅ Allows unique constraint but accepts null values
-    }
-});
+        sparse: true, // ✅ Allows unique constraint but accepts null values
+      },
+      createdAt: {
+        type: Date,
+        default: Date.now,
+      },
+    })
+  );
 
-const usermodel = mongoose.model('users', userschema);
-module.exports = usermodel;
+module.exports = User;

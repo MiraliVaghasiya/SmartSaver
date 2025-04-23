@@ -6,21 +6,21 @@ const User =
   mongoose.model(
     "User",
     new mongoose.Schema({
-      name: {
+    name: {
         type: String,
         required: true,
-      },
-      email: {
+    },
+    email: {
         type: String,
         required: true,
         unique: true,
-      },
-      password: {
+    },
+    password: {
         type: String,
         required: function() {
           return !this.googleId; // Password is only required if not using Google auth
         }
-      },
+    },
       googleId: {
         // ✅ New field for Google authentication
         type: String,

@@ -34,6 +34,7 @@ const ElectricityAnalysis = ({
 }) => {
   const [file, setFile] = useState(null);
   const fileInputRef = useRef(null);
+  const [selectedDataset, setSelectedDataset] = useState(null);
   const defaultChartData = {
     labels: [],
     datasets: [
@@ -125,25 +126,9 @@ const ElectricityAnalysis = ({
       setDatasets(electricityDatasets);
 
       if (electricityDatasets.length > 0) {
-        const mostRecent = electricityDatasets[electricityDatasets.length - 1];
-        if (mostRecent.analysis) {
-          const analysisData = mostRecent.analysis;
-          setChartData(analysisData.chartData || null);
-          setFanData(analysisData.fanData || null);
-          setRefrigeratorData(analysisData.refrigeratorData || null);
-          setWashingMachineData(analysisData.washingMachineData || null);
-          setHeaterData(analysisData.heaterData || null);
-          setLightsData(analysisData.lightsData || null);
-          setElectricityConsumptionByActivityData(
-            analysisData.electricityConsumptionByActivityData || null
-          );
-
-          const generatedSummary = generateSummaryFromData(analysisData);
-          setSummaryData(generatedSummary);
-          setElectricityData(analysisData);
-          // Don't show summary for initial load
-          setShowSummary(false);
-        }
+        const mostRecent = electricityDatasets[0];
+        setSelectedDataset(mostRecent._id);
+        updateAnalysisData(mostRecent.analysis);
       }
     } catch (error) {
       console.error("Error fetching initial datasets:", error);
@@ -151,6 +136,47 @@ const ElectricityAnalysis = ({
         window.location.href = "/login";
       }
     }
+  };
+
+  // New function to handle dataset selection
+  const handleDatasetChange = async (datasetId) => {
+    try {
+      setSelectedDataset(datasetId);
+      const selectedDataset = datasets.find(
+        (dataset) => dataset._id === datasetId
+      );
+      if (selectedDataset) {
+        updateAnalysisData(selectedDataset.analysis);
+      }
+    } catch (error) {
+      console.error("Error changing dataset:", error);
+    }
+  };
+
+  // New function to update analysis data
+  const updateAnalysisData = (analysisData) => {
+    if (!analysisData) return;
+
+    // Set all the data from the analysis
+    setChartData(analysisData.chartData || defaultChartData);
+    setFanData(analysisData.fanData || defaultChartData);
+    setRefrigeratorData(analysisData.refrigeratorData || defaultChartData);
+    setWashingMachineData(analysisData.washingMachineData || defaultChartData);
+    setHeaterData(analysisData.heaterData || defaultChartData);
+    setLightsData(analysisData.lightsData || defaultChartData);
+    setElectricityConsumptionByActivityData(
+      analysisData.electricityConsumptionByActivityData || {
+        labels: [],
+        datasets: [
+          { data: [], backgroundColor: [], borderColor: [], borderWidth: 1 },
+        ],
+      }
+    );
+
+    const generatedSummary = generateSummaryFromData(analysisData);
+    setSummaryData(generatedSummary);
+    setElectricityData(analysisData);
+    setShowSummary(true);
   };
 
   const handleFileChange = (e) => {
@@ -181,67 +207,66 @@ const ElectricityAnalysis = ({
         }
       );
 
-      console.log("Upload response:", response.data);
-
       if (response.data && response.data.analysis) {
         const analysisData = response.data.analysis;
-        console.log("Analysis data:", analysisData);
 
-        // Set all the data from the upload response
-        setChartData(analysisData.chartData || null);
-        setFanData(analysisData.fanData || null);
-        setRefrigeratorData(analysisData.refrigeratorData || null);
-        setWashingMachineData(analysisData.washingMachineData || null);
-        setHeaterData(analysisData.heaterData || null);
-        setLightsData(analysisData.lightsData || null);
-        setElectricityConsumptionByActivityData(
-          analysisData.electricityConsumptionByActivityData || null
-        );
-
-        // Generate and set summary data
-        const generatedSummary = generateSummaryFromData(analysisData);
-        console.log("Generated summary:", generatedSummary);
-        setSummaryData(generatedSummary);
-        setElectricityData(analysisData);
-
-        // Show summary after successful upload
-        setShowSummary(true);
-        console.log("showSummary set to:", true);
-
-        // Reset file input
+        // Clear file input
         setFile(null);
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
 
-        // Update datasets list without affecting the current view
+        // Refresh datasets list and select the newly uploaded dataset
         const datasetsResponse = await axiosInstance.get("/dataset/datasets");
         const electricityDatasets = datasetsResponse.data.filter(
           (dataset) => dataset.type === "electricity"
         );
         setDatasets(electricityDatasets);
+
+        // Find the newly uploaded dataset (it should be the most recent one)
+        if (electricityDatasets.length > 0) {
+          const newlyUploadedDataset = electricityDatasets[0];
+          setSelectedDataset(newlyUploadedDataset._id);
+          updateAnalysisData(newlyUploadedDataset.analysis);
+        }
       }
     } catch (error) {
       console.error("Error uploading file:", error);
       alert("Error uploading file. Please try again.");
-      setShowSummary(false);
     }
   };
 
   return (
     <div className="electricity-analysis-container">
       <h1>Electricity Analysis</h1>
-      <div className="btn-dflex">
-        <input
-          type="file"
-          className="file-uplod"
-          onChange={handleFileChange}
-          ref={fileInputRef}
-          accept=".csv,.xlsx,.xls"
-        />
-        <button className="file-upload-button" onClick={handleUpload}>
-          Upload & Analyze
-        </button>
+      <div className="analysis-controls">
+        <div className="dataset-selector">
+          <select
+            value={selectedDataset || ""}
+            onChange={(e) => handleDatasetChange(e.target.value)}
+            className="dataset-dropdown"
+          >
+            <option value="">Select a dataset</option>
+            {datasets.map((dataset, index) => (
+              <option key={dataset._id} value={dataset._id}>
+                {dataset.name || `Dataset ${index + 1}`} -{" "}
+                {new Date(dataset.createdAt).toLocaleDateString()}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="upload-controls">
+          <input
+            type="file"
+            className="file-uplod"
+            onChange={handleFileChange}
+            ref={fileInputRef}
+            accept=".csv,.xlsx,.xls"
+          />
+          <button className="file-upload-button" onClick={handleUpload}>
+            Upload & Analyze
+          </button>
+        </div>
       </div>
 
       {/* Message when no data is uploaded */}

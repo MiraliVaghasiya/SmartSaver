@@ -352,12 +352,69 @@ const WaterAnalysis = ({ setWaterData }) => {
             className="dataset-dropdown"
           >
             <option value="">Select a dataset</option>
-            {datasets.map((dataset, index) => (
-              <option key={dataset._id} value={dataset._id}>
-                {dataset.name || `Dataset ${index + 1}`} -{" "}
-                {new Date(dataset.createdAt).toLocaleDateString()}
-              </option>
-            ))}
+            {datasets.map((dataset, index) => {
+              // Extract date from dataset
+              let displayDate = "";
+              if (
+                dataset.analysis &&
+                dataset.analysis.chartData &&
+                dataset.analysis.chartData.labels &&
+                dataset.analysis.chartData.labels.length > 0
+              ) {
+                try {
+                  // Get the first date from the chart data
+                  const dateStr = dataset.analysis.chartData.labels[0];
+                  // Split the date string and extract month number and year
+                  const parts = dateStr.split("-");
+                  if (parts.length >= 2) {
+                    let monthNum, year;
+
+                    // Check if the part is a month number (01-12)
+                    if (parseInt(parts[1]) >= 1 && parseInt(parts[1]) <= 12) {
+                      monthNum = parseInt(parts[1]);
+                      year = "2024"; // Set the year to 2024
+                    } else if (
+                      parseInt(parts[0]) >= 1 &&
+                      parseInt(parts[0]) <= 12
+                    ) {
+                      monthNum = parseInt(parts[0]);
+                      year = "2024"; // Set the year to 2024
+                    } else {
+                      monthNum = 1; // Default to January if no valid month
+                      year = "2024";
+                    }
+
+                    // Convert month number to month name
+                    const monthNames = [
+                      "January",
+                      "February",
+                      "March",
+                      "April",
+                      "May",
+                      "June",
+                      "July",
+                      "August",
+                      "September",
+                      "October",
+                      "November",
+                      "December",
+                    ];
+                    const monthName = monthNames[monthNum - 1] || "January";
+
+                    displayDate = `${monthName}-${year}`;
+                  }
+                } catch (error) {
+                  console.error("Error parsing date:", error);
+                  displayDate = "January-2024"; // Default fallback
+                }
+              }
+
+              return (
+                <option key={dataset._id} value={dataset._id}>
+                  Dataset {index + 1} - {displayDate || "January-2024"}
+                </option>
+              );
+            })}
           </select>
         </div>
         <div className="upload-controls">

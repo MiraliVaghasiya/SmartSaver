@@ -270,7 +270,10 @@ const ElectricityAnalysis = ({
       </div>
 
       {/* Message when no data is uploaded */}
-      {!showSummary && !chartData && (
+      {(!showSummary ||
+        !chartData ||
+        !chartData.labels ||
+        chartData.labels.length === 0) && (
         <div
           className="no-data-message"
           style={{ textAlign: "center", marginTop: "20px" }}
@@ -279,8 +282,8 @@ const ElectricityAnalysis = ({
         </div>
       )}
 
-      {/* Charts Section */}
-      {chartData && (
+      {/* Charts Section - Only show when there is actual data */}
+      {chartData && chartData.labels && chartData.labels.length > 0 && (
         <div className="electricity-analysis-graph">
           {/* Overview Section */}
           <div className="analysis-section">

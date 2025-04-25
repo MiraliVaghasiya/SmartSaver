@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import WaterAnalysis from "../components/WaterAnalysis";
 import ElectricityAnalysis from "../components/ElectricityAnalysis";
+import ChatBot from "../components/ChatBot";
 import { ToastContainer } from "react-toastify";
 import "../components/style/Dashboard.css";
 import { Line, Bar, Scatter } from "react-chartjs-2";
@@ -152,6 +153,8 @@ const Dashboard = () => {
           </div>
         )}
       </div>
+
+      <ChatBot waterData={waterData} electricityData={electricityData} />
 
       <ToastContainer />
     </div>

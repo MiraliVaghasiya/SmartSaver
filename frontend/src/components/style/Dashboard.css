@@ -217,6 +217,9 @@ flex-wrap: wrap;
   margin: 10px;
   height: 420px;
 }
+.total-water-usage{
+  /* height: 700px !important; */
+}
 .pie-chart-container {
   height: 200px;
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axiosInstance from "../utils/axios";
 import {
   Line,
@@ -24,6 +24,8 @@ import {
   RadialLinearScale,
 } from "chart.js";
 import "./style/Summary.css";
+import MonthComparison from "./MonthComparison";
+import "./Analysis.css";
 
 ChartJS.register(
   CategoryScale,
@@ -37,6 +39,96 @@ ChartJS.register(
   ArcElement,
   RadialLinearScale
 );
+
+// Add Calendar component
+const Calendar = ({ data, month, year }) => {
+  const getDaysInMonth = (month, year) => new Date(year, month, 0).getDate();
+  const getFirstDayOfMonth = (month, year) =>
+    new Date(year, month - 1, 1).getDay();
+
+  const daysInMonth = getDaysInMonth(month, year);
+  const firstDay = getFirstDayOfMonth(month, year);
+
+  const getColorForUsage = (usage) => {
+    if (!usage) return "#f5f5f5";
+    const maxUsage = Math.max(...Object.values(data));
+    const percentage = (usage / maxUsage) * 100;
+
+    if (percentage <= 20) return "rgba(216, 180, 254, 0.4)";
+    if (percentage <= 40) return "rgba(165, 180, 252, 0.5)";
+    if (percentage <= 60) return "rgba(103, 232, 249, 0.6)";
+    if (percentage <= 80) return "rgba(110, 231, 183, 0.7)";
+    return "rgba(253, 186, 116, 0.8)";
+  };
+
+  const getUsageLevel = (usage) => {
+    if (!usage) return "No Data";
+    const maxUsage = Math.max(...Object.values(data));
+    const percentage = (usage / maxUsage) * 100;
+
+    if (percentage <= 20) return "Very Low Usage";
+    if (percentage <= 40) return "Low Usage";
+    if (percentage <= 60) return "Medium Usage";
+    if (percentage <= 80) return "High Usage";
+    return "Very High Usage";
+  };
+
+  const formatUsage = (usage) => {
+    if (!usage) return "0";
+    return usage.toFixed(1);
+  };
+
+  const generateCalendarDays = () => {
+    const days = [];
+    const totalSlots = Math.ceil((daysInMonth + firstDay) / 7) * 7;
+
+    for (let i = 0; i < totalSlots; i++) {
+      const dayNumber = i - firstDay + 1;
+      const isValidDay = dayNumber > 0 && dayNumber <= daysInMonth;
+      const usage = isValidDay ? data[dayNumber] : null;
+      const usageLevel = isValidDay ? getUsageLevel(usage) : "";
+
+      days.push(
+        <div
+          key={i}
+          className="calendar-day"
+          style={{
+            backgroundColor: isValidDay
+              ? getColorForUsage(usage)
+              : "transparent",
+          }}
+          title={isValidDay ? `${usageLevel}: ${formatUsage(usage)} L` : ""}
+        >
+          {isValidDay && (
+            <>
+              <div className="day-number">{dayNumber}</div>
+              <div className="usage-value">{formatUsage(usage)} L</div>
+              <div className="usage-level">{usageLevel}</div>
+            </>
+          )}
+        </div>
+      );
+    }
+    return days;
+  };
+
+  // Get month name
+  const monthName = new Date(year, month - 1, 1).toLocaleString("default", {
+    month: "long",
+  });
+
+  return (
+    <div className="calendar-container">
+      <h3>{`${monthName} ${year}`}</h3>
+      <div className="calendar-header">
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+          <div key={day}>{day}</div>
+        ))}
+      </div>
+      <div className="calendar-grid">{generateCalendarDays()}</div>
+    </div>
+  );
+};
 
 const WaterAnalysis = ({ setWaterData }) => {
   const [file, setFile] = useState(null);
@@ -72,6 +164,14 @@ const WaterAnalysis = ({ setWaterData }) => {
   });
   const [showSummary, setShowSummary] = useState(false);
   const fileInputRef = React.useRef(null);
+  const [allDatasetsStats, setAllDatasetsStats] = useState({
+    totalAverage: 0,
+    totalStdDev: 0,
+    dailyAverage: 0,
+    dailyStdDev: 0,
+    datasetCount: 0,
+  });
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     // Fetch water datasets for the current user when component mounts
@@ -85,6 +185,9 @@ const WaterAnalysis = ({ setWaterData }) => {
         (dataset) => dataset.type === "water"
       );
       setDatasets(waterDatasets);
+
+      // Calculate statistics from all datasets
+      calculateAllDatasetsStats(waterDatasets);
 
       // If there are datasets, use the most recent one
       if (waterDatasets.length > 0) {
@@ -324,14 +427,108 @@ const WaterAnalysis = ({ setWaterData }) => {
     return Number(value).toFixed(2);
   };
 
-  const getStatusBadge = (value, threshold) => {
+  const getStatusBadge = (value, type = "total") => {
     const numValue = Number(value) || 0;
-    return numValue > threshold ? "warning" : "success";
+
+    // Different thresholds for different types of measurements (in Liters)
+    const thresholds = {
+      total: {
+        low: 4000, // 4000L - Very efficient monthly usage
+        medium: 6000, // 6000L - Average monthly usage
+        high: 9000, // 9000L+ - High monthly usage
+      },
+      daily: {
+        low: 130, // 130L - Efficient daily usage
+        medium: 200, // 200L - Average daily usage
+        high: 300, // 300L+ - High daily usage
+      },
+      shower: {
+        low: 50, // 50L - Efficient shower
+        medium: 80, // 80L - Average shower
+        high: 120, // 120L+ - Long shower
+      },
+      toilet: {
+        low: 30, // 30L - Efficient toilet usage
+        medium: 50, // 50L - Average toilet usage
+        high: 70, // 70L+ - High toilet usage
+      },
+      dishwasher: {
+        low: 10, // 10L - Efficient cycle
+        medium: 15, // 15L - Average cycle
+        high: 20, // 20L+ - Inefficient cycle
+      },
+      washing: {
+        low: 45, // 45L - Efficient cycle
+        medium: 60, // 60L - Average cycle
+        high: 80, // 80L+ - Inefficient cycle
+      },
+      sink: {
+        low: 20, // 20L - Efficient usage
+        medium: 35, // 35L - Average usage
+        high: 50, // 50L+ - High usage
+      },
+    };
+
+    const threshold = thresholds[type] || thresholds.total;
+
+    if (numValue <= threshold.low) return "success";
+    if (numValue <= threshold.medium) return "warning";
+    return "danger";
   };
 
-  const getStatusMessage = (value, threshold) => {
+  const getStatusMessage = (value, type = "total") => {
     const numValue = Number(value) || 0;
-    return numValue > threshold ? "High usage" : "Normal usage";
+
+    // Function to determine status based on standard deviations from mean
+    const getComparativeStatus = (value, mean, stdDev) => {
+      const zScore = (value - mean) / stdDev;
+      if (zScore < -0.5) return "Low";
+      if (zScore > 0.5) return "High";
+      return "Average";
+    };
+
+    // For total consumption
+    if (type === "total" && allDatasetsStats.datasetCount > 0) {
+      const status = getComparativeStatus(
+        numValue,
+        allDatasetsStats.totalAverage,
+        allDatasetsStats.totalStdDev
+      );
+      return `${status} Consumption (${numValue.toFixed(
+        0
+      )}L vs. Avg ${allDatasetsStats.totalAverage.toFixed(0)}L)`;
+    }
+
+    // For daily consumption
+    if (type === "daily" && allDatasetsStats.datasetCount > 0) {
+      const status = getComparativeStatus(
+        numValue,
+        allDatasetsStats.dailyAverage,
+        allDatasetsStats.dailyStdDev
+      );
+      return `${status} Consumption (${numValue.toFixed(
+        0
+      )}L vs. Avg ${allDatasetsStats.dailyAverage.toFixed(0)}L)`;
+    }
+
+    // Fallback to original thresholds for other types
+    const thresholds = {
+      total: { low: 4000, medium: 6000 },
+      daily: { low: 130, medium: 200 },
+      shower: { low: 50, medium: 80 },
+      toilet: { low: 30, medium: 50 },
+      dishwasher: { low: 10, medium: 15 },
+      washing: { low: 45, medium: 60 },
+      sink: { low: 20, medium: 35 },
+    };
+
+    const threshold = thresholds[type] || thresholds.total;
+
+    if (numValue <= threshold.low)
+      return `Low Consumption (≤${threshold.low}L)`;
+    if (numValue <= threshold.medium)
+      return `Average Consumption (≤${threshold.medium}L)`;
+    return `High Consumption (>${threshold.medium}L)`;
   };
 
   // Add a new useEffect to handle data updates
@@ -341,8 +538,92 @@ const WaterAnalysis = ({ setWaterData }) => {
     }
   }, [chartData]);
 
+  // Add function to calculate statistics from all datasets
+  const calculateAllDatasetsStats = (datasetsArray) => {
+    if (!datasetsArray || datasetsArray.length === 0) return;
+
+    let totalConsumptions = [];
+    let dailyConsumptions = [];
+
+    // Collect consumption data from all datasets
+    datasetsArray.forEach((dataset) => {
+      if (dataset.analysis && dataset.analysis.chartData) {
+        const total = dataset.analysis.chartData.datasets[0].data.reduce(
+          (sum, val) => sum + (Number(val) || 0),
+          0
+        );
+        const daily =
+          total / (dataset.analysis.chartData.datasets[0].data.length || 1);
+
+        totalConsumptions.push(total);
+        dailyConsumptions.push(daily);
+      }
+    });
+
+    // Calculate averages
+    const totalAvg =
+      totalConsumptions.reduce((a, b) => a + b, 0) / totalConsumptions.length;
+    const dailyAvg =
+      dailyConsumptions.reduce((a, b) => a + b, 0) / dailyConsumptions.length;
+
+    // Calculate standard deviations
+    const totalStdDev = Math.sqrt(
+      totalConsumptions.reduce((sq, n) => sq + Math.pow(n - totalAvg, 2), 0) /
+        totalConsumptions.length
+    );
+    const dailyStdDev = Math.sqrt(
+      dailyConsumptions.reduce((sq, n) => sq + Math.pow(n - dailyAvg, 2), 0) /
+        dailyConsumptions.length
+    );
+
+    setAllDatasetsStats({
+      totalAverage: totalAvg,
+      totalStdDev: totalStdDev,
+      dailyAverage: dailyAvg,
+      dailyStdDev: dailyStdDev,
+      datasetCount: datasetsArray.length,
+    });
+  };
+
+  // Add comparative analysis section to the summary
+  const renderComparativeAnalysis = () => {
+    if (allDatasetsStats.datasetCount < 2) return null;
+
+    return (
+      <div className="summary-section">
+        <h4>Comparative Analysis</h4>
+        <ul className="insights-list">
+          <li>
+            <strong>Dataset Comparison:</strong> Analysis based on{" "}
+            {allDatasetsStats.datasetCount} datasets
+          </li>
+          <li>
+            <strong>Your Total Usage vs Average:</strong>{" "}
+            {summaryData?.totalWaterConsumption.toFixed(0)}L vs{" "}
+            {allDatasetsStats.totalAverage.toFixed(0)}L
+          </li>
+          <li>
+            <strong>Your Daily Usage vs Average:</strong>{" "}
+            {summaryData?.averageWaterUsage.toFixed(0)}L vs{" "}
+            {allDatasetsStats.dailyAverage.toFixed(0)}L
+          </li>
+        </ul>
+      </div>
+    );
+  };
+
+  const handleComparisonResults = (results) => {
+    // Handle comparison results if needed
+    console.log("Comparison results:", results);
+  };
+
   return (
     <div className="water-analysis-container">
+      <MonthComparison
+        datasets={datasets}
+        onCompare={handleComparisonResults}
+      />
+
       <h1>Water Analysis</h1>
       <div className="analysis-controls">
         <div className="dataset-selector">
@@ -420,7 +701,7 @@ const WaterAnalysis = ({ setWaterData }) => {
         <div className="upload-controls">
           <input
             type="file"
-            className="file-uplod"
+            className="file-upload"
             onChange={handleFileChange}
             ref={fileInputRef}
             accept=".csv,.xlsx,.xls"
@@ -431,38 +712,234 @@ const WaterAnalysis = ({ setWaterData }) => {
         </div>
       </div>
 
-      {/* Message when no data is uploaded */}
-      {!showSummary && !chartData && (
-        <div
-          className="no-data-message"
-          style={{ textAlign: "center", marginTop: "20px" }}
-        >
-          <p>Please upload a dataset to view the analysis.</p>
-        </div>
-      )}
-
-      {/* Charts Section */}
       {chartData && (
         <div className="water-analysis-graph">
-          {/* Overview Section */}
           <div className="analysis-section">
             <h2 className="section-title">Overview</h2>
-            <div className="section-content" style={{ display: "flex" }}>
-              <div style={{ width: "50%" }}>
-                <div className="inner-row">
-                  <h3>Total Water Usage</h3>
-                  <p>
-                    This graph shows the overall water consumption over time.
-                  </p>
-                  {chartData && chartData.labels && chartData.datasets && (
-                    <Bar key={JSON.stringify(chartData)} data={chartData} />
+            <div className="section-content">
+              <div className="inner-row">
+                <h3>Total Water Usage</h3>
+                <p>
+                  This graph shows the breakdown of water consumption by
+                  different utilities over time.
+                </p>
+                <div className="total-water-usage-graph">
+                  {chartData && chartData.labels && (
+                    <Line
+                      data={{
+                        labels: chartData.labels,
+                        datasets: [
+                          {
+                            label: "Bathing",
+                            data: bathingData?.datasets[0]?.data || [],
+                            fill: true,
+                            tension: 0.3,
+                            backgroundColor: "rgba(187, 157, 255, 0.5)",
+                            borderColor: "rgba(187, 157, 255, 1)",
+                            pointRadius: 3,
+                            pointBackgroundColor: "rgba(187, 157, 255, 1)",
+                            borderWidth: 1,
+                            order: 1,
+                          },
+                          {
+                            label: "Washing Clothes",
+                            data: washingClothesData?.datasets[0]?.data || [],
+                            fill: true,
+                            tension: 0.3,
+                            backgroundColor: "rgba(255, 220, 130, 0.5)",
+                            borderColor: "rgba(255, 220, 130, 1)",
+                            pointRadius: 3,
+                            pointBackgroundColor: "rgba(255, 220, 130, 1)",
+                            borderWidth: 1,
+                            order: 2,
+                          },
+                          {
+                            label: "Dishwashing",
+                            data: dishwashingData?.datasets[0]?.data || [],
+                            fill: true,
+                            tension: 0.3,
+                            backgroundColor: "rgba(255, 190, 140, 0.5)",
+                            borderColor: "rgba(255, 190, 140, 1)",
+                            pointRadius: 3,
+                            pointBackgroundColor: "rgba(255, 190, 140, 1)",
+                            borderWidth: 1,
+                            order: 3,
+                          },
+                          {
+                            label: "Drinking",
+                            data: drinkingData?.datasets[0]?.data || [],
+                            fill: true,
+                            tension: 0.3,
+                            backgroundColor: "rgba(255, 170, 180, 0.5)",
+                            borderColor: "rgba(255, 170, 180, 1)",
+                            pointRadius: 3,
+                            pointBackgroundColor: "rgba(255, 170, 180, 1)",
+                            borderWidth: 1,
+                            order: 4,
+                          },
+                          {
+                            label: "Cooking",
+                            data: cookingData?.datasets[0]?.data || [],
+                            fill: true,
+                            tension: 0.3,
+                            backgroundColor: "rgba(140, 220, 220, 0.5)",
+                            borderColor: "rgba(140, 220, 220, 1)",
+                            pointRadius: 3,
+                            pointBackgroundColor: "rgba(140, 220, 220, 1)",
+                            borderWidth: 1,
+                            order: 5,
+                          },
+                        ],
+                      }}
+                      options={{
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: {
+                          mode: "nearest",
+                          axis: "x",
+                          intersect: false,
+                        },
+                        scales: {
+                          x: {
+                            grid: {
+                              display: true,
+                              color: "rgba(0, 0, 0, 0.05)",
+                            },
+                            ticks: {
+                              maxRotation: 45,
+                              minRotation: 45,
+                              color: "#666",
+                              font: {
+                                size: 10,
+                              },
+                            },
+                          },
+                          y: {
+                            stacked: true,
+                            grid: {
+                              display: true,
+                              color: "rgba(0, 0, 0, 0.05)",
+                            },
+                            ticks: {
+                              color: "#666",
+                              font: {
+                                size: 11,
+                              },
+                            },
+                            title: {
+                              display: true,
+                              text: "Water Usage (Liters)",
+                              color: "#666",
+                              font: {
+                                size: 12,
+                                weight: "normal",
+                              },
+                            },
+                          },
+                        },
+                        plugins: {
+                          tooltip: {
+                            mode: "index",
+                            intersect: false,
+                            backgroundColor: "rgba(255, 255, 255, 0.95)",
+                            titleColor: "#000",
+                            bodyColor: "#666",
+                            borderColor: "#ddd",
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: true,
+                            callbacks: {
+                              title: function (context) {
+                                return context[0].label;
+                              },
+                              label: function (context) {
+                                let label = context.dataset.label || "";
+                                if (label) {
+                                  label += ": ";
+                                }
+                                if (context.parsed.y !== null) {
+                                  label += context.parsed.y.toFixed(1) + " L";
+                                }
+                                return label;
+                              },
+                            },
+                          },
+                          legend: {
+                            position: "top",
+                            align: "center",
+                            labels: {
+                              usePointStyle: true,
+                              padding: 15,
+                              boxWidth: 8,
+                              boxHeight: 8,
+                              color: "#666",
+                              font: {
+                                size: 11,
+                              },
+                            },
+                          },
+                        },
+                      }}
+                      style={{
+                        height: "400px", // Fixed smaller height
+                        width: "100%",
+                        background: "white",
+                        padding: "15px", // Reduced padding
+                        borderRadius: "8px",
+                        boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+                      }}
+                    />
                   )}
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Bathroom Section */}
+          <div className="analysis-section">
+            <h2 className="section-title">Monthly Usage Calendar</h2>
+            <div className="section-content">
+              <p>
+                Daily water consumption overview with color-coded intensity.
+              </p>
+              {chartData && chartData.labels && (
+                <Calendar
+                  data={chartData.datasets[0].data.reduce(
+                    (acc, value, index) => {
+                      // Parse the date from the label (assuming format: "DD-MM-YYYY" or "DD/MM/YYYY")
+                      const label = chartData.labels[index];
+                      const parts = label.includes("-")
+                        ? label.split("-")
+                        : label.split("/");
+                      const day = parseInt(parts[0]);
+                      const month = parseInt(parts[1]);
+                      const year = parseInt(parts[2]) || 2024;
+
+                      acc[day] = value;
+                      return acc;
+                    },
+                    {}
+                  )}
+                  month={(() => {
+                    // Get month from the first label
+                    const firstLabel = chartData.labels[0];
+                    const parts = firstLabel.includes("-")
+                      ? firstLabel.split("-")
+                      : firstLabel.split("/");
+                    return parseInt(parts[1]);
+                  })()}
+                  year={(() => {
+                    // Get year from the first label
+                    const firstLabel = chartData.labels[0];
+                    const parts = firstLabel.includes("-")
+                      ? firstLabel.split("-")
+                      : firstLabel.split("/");
+                    return parseInt(parts[2]) || 2024;
+                  })()}
+                />
+              )}
+            </div>
+          </div>
+
           <div className="analysis-section">
             <h2 className="section-title">Bathroom</h2>
             <div className="section-content">
@@ -499,7 +976,6 @@ const WaterAnalysis = ({ setWaterData }) => {
             </div>
           </div>
 
-          {/* Kitchen Section */}
           <div className="analysis-section">
             <h2 className="section-title">Kitchen</h2>
             <div className="section-content">
@@ -536,7 +1012,6 @@ const WaterAnalysis = ({ setWaterData }) => {
             </div>
           </div>
 
-          {/* Laundry Section */}
           <div className="analysis-section">
             <h2 className="section-title">Laundry</h2>
             <div className="section-content">
@@ -559,13 +1034,11 @@ const WaterAnalysis = ({ setWaterData }) => {
             </div>
           </div>
 
-          {/* Analysis Summary Section */}
           <div className="analysis-section">
             <h2 className="section-title">Detailed Analysis</h2>
             <div className="summary-section">
               <h3>Analysis Summary</h3>
               <div className="summary-content">
-                {/* Overall Usage Section */}
                 <div className="summary-section">
                   <h4>Overall Usage</h4>
                   <ul>
@@ -581,12 +1054,12 @@ const WaterAnalysis = ({ setWaterData }) => {
                       <span
                         className={`status-badge ${getStatusBadge(
                           summaryData?.totalWaterConsumption,
-                          1000
+                          "total"
                         )}`}
                       >
                         {getStatusMessage(
                           summaryData?.totalWaterConsumption,
-                          1000
+                          "total"
                         )}
                       </span>
                     </li>
@@ -602,10 +1075,13 @@ const WaterAnalysis = ({ setWaterData }) => {
                       <span
                         className={`status-badge ${getStatusBadge(
                           summaryData?.averageWaterUsage,
-                          100
+                          "daily"
                         )}`}
                       >
-                        {getStatusMessage(summaryData?.averageWaterUsage, 100)}
+                        {getStatusMessage(
+                          summaryData?.averageWaterUsage,
+                          "daily"
+                        )}
                       </span>
                     </li>
                     <li>
@@ -619,7 +1095,6 @@ const WaterAnalysis = ({ setWaterData }) => {
                   </ul>
                 </div>
 
-                {/* Appliance Breakdown Section */}
                 <div className="summary-section">
                   <h4>Appliance Breakdown</h4>
                   <div className="breakdown-grid">
@@ -634,12 +1109,16 @@ const WaterAnalysis = ({ setWaterData }) => {
                               )}{" "}
                               L
                             </span>
-                            <span className="date-info">
-                              Peak: {summaryData?.peakShowerDay || "N/A"}
-                            </span>
-                            <span className="date-info">
-                              Usage on peak day:{" "}
-                              {formatNumber(summaryData?.peakShowerUsage)} L
+                            <span
+                              className={`status-badge ${getStatusBadge(
+                                summaryData?.totalShowerConsumption,
+                                "shower"
+                              )}`}
+                            >
+                              {getStatusMessage(
+                                summaryData?.totalShowerConsumption,
+                                "shower"
+                              )}
                             </span>
                           </div>
                         </li>
@@ -652,12 +1131,16 @@ const WaterAnalysis = ({ setWaterData }) => {
                               )}{" "}
                               L
                             </span>
-                            <span className="date-info">
-                              Peak: {summaryData?.peakToiletDay || "N/A"}
-                            </span>
-                            <span className="date-info">
-                              Usage on peak day:{" "}
-                              {formatNumber(summaryData?.peakToiletUsage)} L
+                            <span
+                              className={`status-badge ${getStatusBadge(
+                                summaryData?.totalToiletConsumption,
+                                "toilet"
+                              )}`}
+                            >
+                              {getStatusMessage(
+                                summaryData?.totalToiletConsumption,
+                                "toilet"
+                              )}
                             </span>
                           </div>
                         </li>
@@ -670,12 +1153,16 @@ const WaterAnalysis = ({ setWaterData }) => {
                               )}{" "}
                               L
                             </span>
-                            <span className="date-info">
-                              Peak: {summaryData?.peakDishwasherDay || "N/A"}
-                            </span>
-                            <span className="date-info">
-                              Usage on peak day:{" "}
-                              {formatNumber(summaryData?.peakDishwasherUsage)} L
+                            <span
+                              className={`status-badge ${getStatusBadge(
+                                summaryData?.totalDishwasherConsumption,
+                                "dishwasher"
+                              )}`}
+                            >
+                              {getStatusMessage(
+                                summaryData?.totalDishwasherConsumption,
+                                "dishwasher"
+                              )}
                             </span>
                           </div>
                         </li>
@@ -692,16 +1179,16 @@ const WaterAnalysis = ({ setWaterData }) => {
                               )}{" "}
                               L
                             </span>
-                            <span className="date-info">
-                              Peak:{" "}
-                              {summaryData?.peakWashingMachineDay || "N/A"}
-                            </span>
-                            <span className="date-info">
-                              Usage on peak day:{" "}
-                              {formatNumber(
-                                summaryData?.peakWashingMachineUsage
-                              )}{" "}
-                              L
+                            <span
+                              className={`status-badge ${getStatusBadge(
+                                summaryData?.totalWashingMachineConsumption,
+                                "washing"
+                              )}`}
+                            >
+                              {getStatusMessage(
+                                summaryData?.totalWashingMachineConsumption,
+                                "washing"
+                              )}
                             </span>
                           </div>
                         </li>
@@ -712,12 +1199,16 @@ const WaterAnalysis = ({ setWaterData }) => {
                               {formatNumber(summaryData?.totalSinkConsumption)}{" "}
                               L
                             </span>
-                            <span className="date-info">
-                              Peak: {summaryData?.peakSinkDay || "N/A"}
-                            </span>
-                            <span className="date-info">
-                              Usage on peak day:{" "}
-                              {formatNumber(summaryData?.peakSinkUsage)} L
+                            <span
+                              className={`status-badge ${getStatusBadge(
+                                summaryData?.totalSinkConsumption,
+                                "sink"
+                              )}`}
+                            >
+                              {getStatusMessage(
+                                summaryData?.totalSinkConsumption,
+                                "sink"
+                              )}
                             </span>
                           </div>
                         </li>
@@ -726,12 +1217,11 @@ const WaterAnalysis = ({ setWaterData }) => {
                   </div>
                 </div>
 
-                {/* Key Insights Section */}
                 <div className="summary-section">
                   <h4>Key Insights</h4>
                   <ul className="insights-list">
                     <li>
-                      <strong>Most Water-Intensive Appliance:</strong>{" "}
+                      <strong>Most Water-Intensive Appliance:</strong>
                       <span className="insight-badge">
                         {(() => {
                           const consumptions = {
@@ -759,31 +1249,35 @@ const WaterAnalysis = ({ setWaterData }) => {
                       </span>
                     </li>
                     <li>
-                      <strong>Usage Status:</strong>{" "}
+                      <strong>Usage Status:</strong>
                       <span
                         className={`status-badge ${getStatusBadge(
                           summaryData?.averageWaterUsage,
-                          100
+                          "daily"
                         )}`}
                       >
-                        {getStatusMessage(summaryData?.averageWaterUsage, 100)}
+                        {getStatusMessage(
+                          summaryData?.averageWaterUsage,
+                          "daily"
+                        )}
                       </span>
                     </li>
                   </ul>
                 </div>
+
+                {renderComparativeAnalysis()}
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Standalone Summary Section for when there's no chart data */}
+      {/* Standalone Summary Section */}
       {!chartData && showSummary && (
-        <div className="standalone-summary" style={{ marginTop: "20px" }}>
+        <div className="standalone-summary">
           <div className="summary-section">
             <h3>Analysis Summary</h3>
             <div className="summary-content">
-              {/* Overall Usage Section */}
               <div className="summary-section">
                 <h4>Overall Usage</h4>
                 <ul>
@@ -799,12 +1293,12 @@ const WaterAnalysis = ({ setWaterData }) => {
                     <span
                       className={`status-badge ${getStatusBadge(
                         summaryData?.totalWaterConsumption,
-                        1000
+                        "total"
                       )}`}
                     >
                       {getStatusMessage(
                         summaryData?.totalWaterConsumption,
-                        1000
+                        "total"
                       )}
                     </span>
                   </li>
@@ -820,10 +1314,13 @@ const WaterAnalysis = ({ setWaterData }) => {
                     <span
                       className={`status-badge ${getStatusBadge(
                         summaryData?.averageWaterUsage,
-                        100
+                        "daily"
                       )}`}
                     >
-                      {getStatusMessage(summaryData?.averageWaterUsage, 100)}
+                      {getStatusMessage(
+                        summaryData?.averageWaterUsage,
+                        "daily"
+                      )}
                     </span>
                   </li>
                   <li>
@@ -837,7 +1334,6 @@ const WaterAnalysis = ({ setWaterData }) => {
                 </ul>
               </div>
 
-              {/* Appliance Breakdown Section */}
               <div className="summary-section">
                 <h4>Appliance Breakdown</h4>
                 <div className="breakdown-grid">
@@ -850,12 +1346,16 @@ const WaterAnalysis = ({ setWaterData }) => {
                             {formatNumber(summaryData?.totalShowerConsumption)}{" "}
                             L
                           </span>
-                          <span className="date-info">
-                            Peak: {summaryData?.peakShowerDay || "N/A"}
-                          </span>
-                          <span className="date-info">
-                            Usage on peak day:{" "}
-                            {formatNumber(summaryData?.peakShowerUsage)} L
+                          <span
+                            className={`status-badge ${getStatusBadge(
+                              summaryData?.totalShowerConsumption,
+                              "shower"
+                            )}`}
+                          >
+                            {getStatusMessage(
+                              summaryData?.totalShowerConsumption,
+                              "shower"
+                            )}
                           </span>
                         </div>
                       </li>
@@ -866,12 +1366,16 @@ const WaterAnalysis = ({ setWaterData }) => {
                             {formatNumber(summaryData?.totalToiletConsumption)}{" "}
                             L
                           </span>
-                          <span className="date-info">
-                            Peak: {summaryData?.peakToiletDay || "N/A"}
-                          </span>
-                          <span className="date-info">
-                            Usage on peak day:{" "}
-                            {formatNumber(summaryData?.peakToiletUsage)} L
+                          <span
+                            className={`status-badge ${getStatusBadge(
+                              summaryData?.totalToiletConsumption,
+                              "toilet"
+                            )}`}
+                          >
+                            {getStatusMessage(
+                              summaryData?.totalToiletConsumption,
+                              "toilet"
+                            )}
                           </span>
                         </div>
                       </li>
@@ -884,12 +1388,16 @@ const WaterAnalysis = ({ setWaterData }) => {
                             )}{" "}
                             L
                           </span>
-                          <span className="date-info">
-                            Peak: {summaryData?.peakDishwasherDay || "N/A"}
-                          </span>
-                          <span className="date-info">
-                            Usage on peak day:{" "}
-                            {formatNumber(summaryData?.peakDishwasherUsage)} L
+                          <span
+                            className={`status-badge ${getStatusBadge(
+                              summaryData?.totalDishwasherConsumption,
+                              "dishwasher"
+                            )}`}
+                          >
+                            {getStatusMessage(
+                              summaryData?.totalDishwasherConsumption,
+                              "dishwasher"
+                            )}
                           </span>
                         </div>
                       </li>
@@ -906,13 +1414,16 @@ const WaterAnalysis = ({ setWaterData }) => {
                             )}{" "}
                             L
                           </span>
-                          <span className="date-info">
-                            Peak: {summaryData?.peakWashingMachineDay || "N/A"}
-                          </span>
-                          <span className="date-info">
-                            Usage on peak day:{" "}
-                            {formatNumber(summaryData?.peakWashingMachineUsage)}{" "}
-                            L
+                          <span
+                            className={`status-badge ${getStatusBadge(
+                              summaryData?.totalWashingMachineConsumption,
+                              "washing"
+                            )}`}
+                          >
+                            {getStatusMessage(
+                              summaryData?.totalWashingMachineConsumption,
+                              "washing"
+                            )}
                           </span>
                         </div>
                       </li>
@@ -922,12 +1433,16 @@ const WaterAnalysis = ({ setWaterData }) => {
                           <span className="value">
                             {formatNumber(summaryData?.totalSinkConsumption)} L
                           </span>
-                          <span className="date-info">
-                            Peak: {summaryData?.peakSinkDay || "N/A"}
-                          </span>
-                          <span className="date-info">
-                            Usage on peak day:{" "}
-                            {formatNumber(summaryData?.peakSinkUsage)} L
+                          <span
+                            className={`status-badge ${getStatusBadge(
+                              summaryData?.totalSinkConsumption,
+                              "sink"
+                            )}`}
+                          >
+                            {getStatusMessage(
+                              summaryData?.totalSinkConsumption,
+                              "sink"
+                            )}
                           </span>
                         </div>
                       </li>
@@ -936,12 +1451,11 @@ const WaterAnalysis = ({ setWaterData }) => {
                 </div>
               </div>
 
-              {/* Key Insights Section */}
               <div className="summary-section">
                 <h4>Key Insights</h4>
                 <ul className="insights-list">
                   <li>
-                    <strong>Most Water-Intensive Appliance:</strong>{" "}
+                    <strong>Most Water-Intensive Appliance:</strong>
                     <span className="insight-badge">
                       {(() => {
                         const consumptions = {
@@ -968,18 +1482,23 @@ const WaterAnalysis = ({ setWaterData }) => {
                     </span>
                   </li>
                   <li>
-                    <strong>Usage Status:</strong>{" "}
+                    <strong>Usage Status:</strong>
                     <span
                       className={`status-badge ${getStatusBadge(
                         summaryData?.averageWaterUsage,
-                        100
+                        "daily"
                       )}`}
                     >
-                      {getStatusMessage(summaryData?.averageWaterUsage, 100)}
+                      {getStatusMessage(
+                        summaryData?.averageWaterUsage,
+                        "daily"
+                      )}
                     </span>
                   </li>
                 </ul>
               </div>
+
+              {renderComparativeAnalysis()}
             </div>
           </div>
         </div>

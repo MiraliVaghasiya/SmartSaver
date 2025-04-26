@@ -3,7 +3,7 @@ import "./style/Summary.css";
 import "./Analysis.css";
 
 const MonthComparison = ({ datasets, onCompare }) => {
-  const [selectedMonths, setSelectedMonths] = useState([]);
+  const [selectedMonthYears, setSelectedMonthYears] = useState([]);
   const [comparisonResults, setComparisonResults] = useState(null);
   const [isOpen, setIsOpen] = useState(false);
 
@@ -22,37 +22,9 @@ const MonthComparison = ({ datasets, onCompare }) => {
     "December",
   ];
 
-  // Function to get the total water consumption for a specific month from a dataset
-  const getMonthTotal = (dataset, monthName) => {
-    if (
-      !dataset?.analysis?.chartData?.labels ||
-      !dataset?.analysis?.chartData?.datasets?.[0]?.data
-    ) {
-      return 0;
-    }
-
-    let total = 0;
-    const labels = dataset.analysis.chartData.labels;
-    const data = dataset.analysis.chartData.datasets[0].data;
-
-    // Iterate through the labels and sum up the values for the specified month
-    labels.forEach((label, index) => {
-      // Parse the date from the label (format: "DD-MM-YYYY" or "DD/MM/YYYY")
-      const parts = label.includes("-") ? label.split("-") : label.split("/");
-      const monthNum = parseInt(parts[1]) - 1; // Convert to 0-based month index
-
-      if (monthNames[monthNum] === monthName) {
-        total += parseFloat(data[index]) || 0;
-      }
-    });
-
-    return total;
-  };
-
-  // Function to get available months from all datasets
-  const getAvailableMonths = () => {
-    const monthsData = {};
-
+  // Get all available (month, year) pairs from all datasets
+  const getAvailableMonthYears = () => {
+    const monthYearSet = new Set();
     datasets.forEach((dataset) => {
       if (dataset?.analysis?.chartData?.labels) {
         dataset.analysis.chartData.labels.forEach((label) => {
@@ -60,53 +32,77 @@ const MonthComparison = ({ datasets, onCompare }) => {
             ? label.split("-")
             : label.split("/");
           const monthNum = parseInt(parts[1]) - 1;
-          const monthName = monthNames[monthNum];
-          const total = getMonthTotal(dataset, monthName);
-
-          if (total > 0) {
-            monthsData[monthName] = total;
+          const year = parts[2];
+          if (!isNaN(monthNum) && year) {
+            const key = `${monthNames[monthNum]} ${year}`;
+            monthYearSet.add(key);
           }
         });
       }
     });
-
-    return monthsData;
+    // Sort by year then month
+    return Array.from(monthYearSet).sort((a, b) => {
+      const [monthA, yearA] = a.split(" ");
+      const [monthB, yearB] = b.split(" ");
+      if (yearA !== yearB) return parseInt(yearA) - parseInt(yearB);
+      return monthNames.indexOf(monthA) - monthNames.indexOf(monthB);
+    });
   };
 
-  const handleMonthSelect = (month) => {
-    if (selectedMonths.includes(month)) {
-      setSelectedMonths(selectedMonths.filter((m) => m !== month));
+  // Get total for a specific (month, year) pair
+  const getMonthYearTotal = (dataset, monthName, year) => {
+    if (
+      !dataset?.analysis?.chartData?.labels ||
+      !dataset?.analysis?.chartData?.datasets?.[0]?.data
+    ) {
+      return 0;
+    }
+    let total = 0;
+    const labels = dataset.analysis.chartData.labels;
+    const data = dataset.analysis.chartData.datasets[0].data;
+    labels.forEach((label, index) => {
+      const parts = label.includes("-") ? label.split("-") : label.split("/");
+      const monthNum = parseInt(parts[1]) - 1;
+      const labelYear = parts[2];
+      if (monthNames[monthNum] === monthName && labelYear === year) {
+        total += parseFloat(data[index]) || 0;
+      }
+    });
+    return total;
+  };
+
+  const handleMonthYearSelect = (monthYear) => {
+    if (selectedMonthYears.includes(monthYear)) {
+      setSelectedMonthYears(selectedMonthYears.filter((m) => m !== monthYear));
     } else {
-      setSelectedMonths([...selectedMonths, month]);
+      setSelectedMonthYears([...selectedMonthYears, monthYear]);
     }
   };
 
   const compareMonths = () => {
-    if (selectedMonths.length < 2) {
+    if (selectedMonthYears.length < 2) {
       alert("Please select at least two months to compare");
       return;
     }
-
-    const results = selectedMonths.map((month) => {
+    const results = selectedMonthYears.map((monthYear) => {
+      const [monthName, year] = monthYear.split(" ");
       const total = datasets.reduce(
-        (sum, dataset) => sum + getMonthTotal(dataset, month),
+        (sum, dataset) => sum + getMonthYearTotal(dataset, monthName, year),
         0
       );
       const daysInMonth = new Date(
-        2024,
-        monthNames.indexOf(month) + 1,
+        parseInt(year),
+        monthNames.indexOf(monthName) + 1,
         0
       ).getDate();
       const dailyAverage = total / daysInMonth;
-
       return {
-        month,
+        monthYear,
         total: total || 0,
         dailyAverage: dailyAverage || 0,
         hasData: total > 0,
       };
     });
-
     setComparisonResults(results);
     if (onCompare) {
       onCompare(results);
@@ -122,47 +118,41 @@ const MonthComparison = ({ datasets, onCompare }) => {
       >
         {isOpen ? "◀" : "▶"}
       </button>
-
       <div className={`month-comparison ${isOpen ? "open" : ""}`}>
         <div className="comparison-header">
           <h2>Compare Months</h2>
         </div>
-
         <div className="comparison-content">
           <div className="month-grid">
-            {monthNames.map((month) => {
-              const monthData = getAvailableMonths()[month];
-              const isSelected = selectedMonths.includes(month);
-
+            {getAvailableMonthYears().map((monthYear) => {
+              const isSelected = selectedMonthYears.includes(monthYear);
               return (
                 <button
-                  key={month}
-                  onClick={() => handleMonthSelect(month)}
+                  key={monthYear}
+                  onClick={() => handleMonthYearSelect(monthYear)}
                   className={`month-button ${isSelected ? "selected" : ""}`}
                 >
-                  {month} {monthData ? `(${monthData.toFixed(2)}L)` : ""}
+                  {monthYear}
                 </button>
               );
             })}
           </div>
-
           <button
             className="compare-button"
             onClick={compareMonths}
-            disabled={selectedMonths.length < 2}
+            disabled={selectedMonthYears.length < 2}
           >
             Compare Selected Months
           </button>
-
           {comparisonResults && (
             <div className="comparison-results">
               <h3>📊 Comparison Results</h3>
               <div className="monthly-totals">
                 <h4>Monthly Totals:</h4>
                 {comparisonResults.map((result) => (
-                  <div key={result.month} className="month-result">
+                  <div key={result.monthYear} className="month-result">
                     <h5>
-                      {result.month} {result.hasData ? "" : "(N/A)"}:
+                      {result.monthYear} {result.hasData ? "" : "(N/A)"}:
                     </h5>
                     <p>Total: {result.total.toFixed(2)} liters</p>
                     <p>
@@ -171,7 +161,6 @@ const MonthComparison = ({ datasets, onCompare }) => {
                   </div>
                 ))}
               </div>
-
               {comparisonResults.length >= 2 && (
                 <div className="comparison-analysis">
                   <h4>Analysis:</h4>
@@ -184,15 +173,14 @@ const MonthComparison = ({ datasets, onCompare }) => {
                     const difference = highest.total - lowest.total;
                     const percentageDiff =
                       (difference / lowest.total) * 100 || 0;
-
                     return (
                       <>
                         <p>
-                          <strong>Highest Usage:</strong> {highest.month} (
+                          <strong>Highest Usage:</strong> {highest.monthYear} (
                           {highest.total.toFixed(2)} liters)
                         </p>
                         <p>
-                          <strong>Lowest Usage:</strong> {lowest.month} (
+                          <strong>Lowest Usage:</strong> {lowest.monthYear} (
                           {lowest.total.toFixed(2)} liters)
                         </p>
                         {highest.total > 0 && lowest.total > 0 && (

@@ -930,6 +930,80 @@ const WaterAnalysis = ({
     });
     yPos += 15;
 
+    // 7b. Appliance Breakdown (detailed)
+    checkPageBreak(60);
+    doc.setFontSize(16);
+    doc.text("8. Appliance Breakdown", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    const applianceSummary = [
+      {
+        name: "Shower",
+        total: summaryData?.totalShowerConsumption,
+        peakDay: summaryData?.peakShowerDay,
+        peakUsage: summaryData?.peakShowerUsage,
+        unit: "L",
+      },
+      {
+        name: "Toilet",
+        total: summaryData?.totalToiletConsumption,
+        peakDay: summaryData?.peakToiletDay,
+        peakUsage: summaryData?.peakToiletUsage,
+        unit: "L",
+      },
+      {
+        name: "Dishwasher",
+        total: summaryData?.totalDishwasherConsumption,
+        peakDay: summaryData?.peakDishwasherDay,
+        peakUsage: summaryData?.peakDishwasherUsage,
+        unit: "L",
+      },
+      {
+        name: "Washing Machine",
+        total: summaryData?.totalWashingMachineConsumption,
+        peakDay: summaryData?.peakWashingMachineDay,
+        peakUsage: summaryData?.peakWashingMachineUsage,
+        unit: "L",
+      },
+      {
+        name: "Sink",
+        total: summaryData?.totalSinkConsumption,
+        peakDay: summaryData?.peakSinkDay,
+        peakUsage: summaryData?.peakSinkUsage,
+        unit: "L",
+      },
+    ];
+    applianceSummary.forEach((appliance) => {
+      checkPageBreak(18);
+      doc.setFont(undefined, "bold");
+      doc.text(`${appliance.name}:`, margin, yPos);
+      doc.setFont(undefined, "normal");
+      yPos += 7;
+      doc.text(
+        `  Total Usage: ${appliance.total?.toFixed(2) ?? "N/A"} ${
+          appliance.unit
+        }`,
+        margin + 5,
+        yPos
+      );
+      yPos += 6;
+      doc.text(
+        `  Peak Usage Day: ${appliance.peakDay ?? "N/A"}`,
+        margin + 5,
+        yPos
+      );
+      yPos += 6;
+      doc.text(
+        `  Usage on Peak Day: ${appliance.peakUsage?.toFixed(2) ?? "N/A"} ${
+          appliance.unit
+        }`,
+        margin + 5,
+        yPos
+      );
+      yPos += 6;
+    });
+    yPos += 5;
+
     // 8. Comparative Analysis
     checkPageBreak(30);
     doc.setFontSize(16);
@@ -1731,17 +1805,6 @@ const WaterAnalysis = ({
                               )}{" "}
                               L
                             </span>
-                            <span
-                              className={`status-badge ${getStatusBadge(
-                                summaryData?.totalShowerConsumption,
-                                "shower"
-                              )}`}
-                            >
-                              {getStatusMessage(
-                                summaryData?.totalShowerConsumption,
-                                "shower"
-                              )}
-                            </span>
                           </div>
                         </li>
                         <li>
@@ -1753,17 +1816,6 @@ const WaterAnalysis = ({
                               )}{" "}
                               L
                             </span>
-                            <span
-                              className={`status-badge ${getStatusBadge(
-                                summaryData?.totalToiletConsumption,
-                                "toilet"
-                              )}`}
-                            >
-                              {getStatusMessage(
-                                summaryData?.totalToiletConsumption,
-                                "toilet"
-                              )}
-                            </span>
                           </div>
                         </li>
                         <li>
@@ -1774,17 +1826,6 @@ const WaterAnalysis = ({
                                 summaryData?.totalDishwasherConsumption
                               )}{" "}
                               L
-                            </span>
-                            <span
-                              className={`status-badge ${getStatusBadge(
-                                summaryData?.totalDishwasherConsumption,
-                                "dishwasher"
-                              )}`}
-                            >
-                              {getStatusMessage(
-                                summaryData?.totalDishwasherConsumption,
-                                "dishwasher"
-                              )}
                             </span>
                           </div>
                         </li>
@@ -1801,17 +1842,6 @@ const WaterAnalysis = ({
                               )}{" "}
                               L
                             </span>
-                            <span
-                              className={`status-badge ${getStatusBadge(
-                                summaryData?.totalWashingMachineConsumption,
-                                "washing"
-                              )}`}
-                            >
-                              {getStatusMessage(
-                                summaryData?.totalWashingMachineConsumption,
-                                "washing"
-                              )}
-                            </span>
                           </div>
                         </li>
                         <li>
@@ -1820,17 +1850,6 @@ const WaterAnalysis = ({
                             <span className="value">
                               {formatNumber(summaryData?.totalSinkConsumption)}{" "}
                               L
-                            </span>
-                            <span
-                              className={`status-badge ${getStatusBadge(
-                                summaryData?.totalSinkConsumption,
-                                "sink"
-                              )}`}
-                            >
-                              {getStatusMessage(
-                                summaryData?.totalSinkConsumption,
-                                "sink"
-                              )}
                             </span>
                           </div>
                         </li>
@@ -1968,17 +1987,6 @@ const WaterAnalysis = ({
                             {formatNumber(summaryData?.totalShowerConsumption)}{" "}
                             L
                           </span>
-                          <span
-                            className={`status-badge ${getStatusBadge(
-                              summaryData?.totalShowerConsumption,
-                              "shower"
-                            )}`}
-                          >
-                            {getStatusMessage(
-                              summaryData?.totalShowerConsumption,
-                              "shower"
-                            )}
-                          </span>
                         </div>
                       </li>
                       <li>
@@ -1987,17 +1995,6 @@ const WaterAnalysis = ({
                           <span className="value">
                             {formatNumber(summaryData?.totalToiletConsumption)}{" "}
                             L
-                          </span>
-                          <span
-                            className={`status-badge ${getStatusBadge(
-                              summaryData?.totalToiletConsumption,
-                              "toilet"
-                            )}`}
-                          >
-                            {getStatusMessage(
-                              summaryData?.totalToiletConsumption,
-                              "toilet"
-                            )}
                           </span>
                         </div>
                       </li>
@@ -2009,17 +2006,6 @@ const WaterAnalysis = ({
                               summaryData?.totalDishwasherConsumption
                             )}{" "}
                             L
-                          </span>
-                          <span
-                            className={`status-badge ${getStatusBadge(
-                              summaryData?.totalDishwasherConsumption,
-                              "dishwasher"
-                            )}`}
-                          >
-                            {getStatusMessage(
-                              summaryData?.totalDishwasherConsumption,
-                              "dishwasher"
-                            )}
                           </span>
                         </div>
                       </li>
@@ -2036,17 +2022,6 @@ const WaterAnalysis = ({
                             )}{" "}
                             L
                           </span>
-                          <span
-                            className={`status-badge ${getStatusBadge(
-                              summaryData?.totalWashingMachineConsumption,
-                              "washing"
-                            )}`}
-                          >
-                            {getStatusMessage(
-                              summaryData?.totalWashingMachineConsumption,
-                              "washing"
-                            )}
-                          </span>
                         </div>
                       </li>
                       <li>
@@ -2054,17 +2029,6 @@ const WaterAnalysis = ({
                         <div>
                           <span className="value">
                             {formatNumber(summaryData?.totalSinkConsumption)} L
-                          </span>
-                          <span
-                            className={`status-badge ${getStatusBadge(
-                              summaryData?.totalSinkConsumption,
-                              "sink"
-                            )}`}
-                          >
-                            {getStatusMessage(
-                              summaryData?.totalSinkConsumption,
-                              "sink"
-                            )}
                           </span>
                         </div>
                       </li>

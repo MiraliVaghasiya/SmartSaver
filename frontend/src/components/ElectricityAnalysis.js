@@ -1051,6 +1051,80 @@ const ElectricityAnalysis = ({
     });
     yPos += 15;
 
+    // 7b. Appliance Breakdown (detailed)
+    checkPageBreak(60);
+    doc.setFontSize(16);
+    doc.text("8. Appliance Breakdown", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    const applianceSummary = [
+      {
+        name: "Fan",
+        total: summaryDataState?.totalFanConsumption,
+        peakDay: summaryDataState?.peakFanDay,
+        peakUsage: summaryDataState?.peakFanUsage,
+        unit: "kWh",
+      },
+      {
+        name: "Refrigerator",
+        total: summaryDataState?.totalRefrigeratorConsumption,
+        peakDay: summaryDataState?.peakRefrigeratorDay,
+        peakUsage: summaryDataState?.peakRefrigeratorUsage,
+        unit: "kWh",
+      },
+      {
+        name: "Washing Machine",
+        total: summaryDataState?.totalWashingMachineConsumption,
+        peakDay: summaryDataState?.peakWashingMachineDay,
+        peakUsage: summaryDataState?.peakWashingMachineUsage,
+        unit: "kWh",
+      },
+      {
+        name: "Heater",
+        total: summaryDataState?.totalHeaterConsumption,
+        peakDay: summaryDataState?.peakHeaterDay,
+        peakUsage: summaryDataState?.peakHeaterUsage,
+        unit: "kWh",
+      },
+      {
+        name: "Lights",
+        total: summaryDataState?.totalLightsConsumption,
+        peakDay: summaryDataState?.peakLightsDay,
+        peakUsage: summaryDataState?.peakLightsUsage,
+        unit: "kWh",
+      },
+    ];
+    applianceSummary.forEach((appliance) => {
+      checkPageBreak(18);
+      doc.setFont(undefined, "bold");
+      doc.text(`${appliance.name}:`, margin, yPos);
+      doc.setFont(undefined, "normal");
+      yPos += 7;
+      doc.text(
+        `  Total Usage: ${appliance.total?.toFixed(2) ?? "N/A"} ${
+          appliance.unit
+        }`,
+        margin + 5,
+        yPos
+      );
+      yPos += 6;
+      doc.text(
+        `  Peak Usage Day: ${appliance.peakDay ?? "N/A"}`,
+        margin + 5,
+        yPos
+      );
+      yPos += 6;
+      doc.text(
+        `  Usage on Peak Day: ${appliance.peakUsage?.toFixed(2) ?? "N/A"} ${
+          appliance.unit
+        }`,
+        margin + 5,
+        yPos
+      );
+      yPos += 6;
+    });
+    yPos += 5;
+
     // 8. Comparative Analysis
     checkPageBreak(30);
     doc.setFontSize(16);

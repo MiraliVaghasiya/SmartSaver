@@ -20,6 +20,7 @@ const Dashboard = () => {
   });
   const [summaryData, setSummaryData] = useState(null);
   const [summaryType, setSummaryType] = useState(null);
+  const [allDatasetsStats, setAllDatasetsStats] = useState(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -140,6 +141,7 @@ const Dashboard = () => {
             setWaterData={setWaterData}
             setSummaryData={setSummaryData}
             setSummaryType={() => setSummaryType("water")}
+            setAllDatasetsStats={setAllDatasetsStats}
           />
         )}
         {selectedOption === "electricity" && (
@@ -149,6 +151,7 @@ const Dashboard = () => {
             selectedFilePath={selectedFilePath}
             setSummaryData={setSummaryData}
             setSummaryType={() => setSummaryType("electricity")}
+            setAllDatasetsStats={setAllDatasetsStats}
           />
         )}
         {!selectedOption && (
@@ -162,7 +165,10 @@ const Dashboard = () => {
         )}
       </div>
 
-      <ChatBot summaryData={summaryData} type={summaryType} />
+      <ChatBot
+        summaryData={{ ...summaryData, allDatasetsStats }}
+        type={summaryType}
+      />
 
       <ToastContainer />
     </div>

@@ -93,57 +93,6 @@ const ChatBot = ({ summaryData, type }) => {
     if (!summaryData)
       return "No data loaded. Please select or upload a dataset.";
     const q = query.toLowerCase();
-    // Dataset Comparison
-    if (q.includes("dataset comparison") || q.includes("compare dataset")) {
-      return `Dataset Comparison:\n- This feature compares your current dataset to others.\n(If you want a specific comparison, please select months or datasets in the UI.)`;
-    }
-    // Your Total Usage vs Average
-    if (
-      q.includes("your total usage vs average") ||
-      q.includes("total usage vs average")
-    ) {
-      if (type === "water") {
-        return `Your Total Usage vs Average:\n- Total: ${Number(
-          summaryData.totalWaterConsumption
-        ).toFixed(2)} L\n- Daily Average: ${Number(
-          summaryData.averageWaterUsage
-        ).toFixed(2)} L`;
-      } else {
-        return `Your Total Usage vs Average:\n- Total: ${Number(
-          summaryData.totalElectricityConsumption
-        ).toFixed(2)} kWh\n- Daily Average: ${Number(
-          summaryData.averageElectricityUsage
-        ).toFixed(2)} kWh`;
-      }
-    }
-    // Appliance Breakdown
-    if (q.includes("appliance breakdown")) {
-      if (type === "water") {
-        return `Appliance Breakdown:\n- Shower: ${Number(
-          summaryData.totalShowerConsumption
-        ).toFixed(2)} L\n- Toilet: ${Number(
-          summaryData.totalToiletConsumption
-        ).toFixed(2)} L\n- Dishwasher: ${Number(
-          summaryData.totalDishwasherConsumption
-        ).toFixed(2)} L\n- Washing Machine: ${Number(
-          summaryData.totalWashingMachineConsumption
-        ).toFixed(2)} L\n- Sink: ${Number(
-          summaryData.totalSinkConsumption
-        ).toFixed(2)} L`;
-      } else {
-        return `Appliance Breakdown:\n- Fan: ${Number(
-          summaryData.totalFanConsumption
-        ).toFixed(2)} kWh\n- Heater: ${Number(
-          summaryData.totalHeaterConsumption
-        ).toFixed(2)} kWh\n- Refrigerator: ${Number(
-          summaryData.totalRefrigeratorConsumption
-        ).toFixed(2)} kWh\n- Washing Machine: ${Number(
-          summaryData.totalWashingMachineConsumption
-        ).toFixed(2)} kWh\n- Lights: ${Number(
-          summaryData.totalLightsConsumption
-        ).toFixed(2)} kWh`;
-      }
-    }
     // Water
     if (type === "water") {
       if (q.includes("total water"))
@@ -186,6 +135,21 @@ const ChatBot = ({ summaryData, type }) => {
         return `Usage Status: ${getUsageStatus(summaryData, "water")}`;
       if (q.includes("tip") || q.includes("save") || q.includes("reduce")) {
         return `💡 Water Saving Tips:\n- ${waterTips.join("\n- ")}`;
+      }
+      // Add dataset comparison queries
+      if (q.includes("dataset comparison") || q.includes("compare datasets")) {
+        if (summaryData.allDatasetsStats?.datasetCount < 2) {
+          return "Not enough datasets available for comparison. Please upload more datasets.";
+        }
+        return `Dataset Comparison:\n- Total Usage vs Average: ${Number(
+          summaryData.totalWaterConsumption
+        ).toFixed(2)}L vs ${summaryData.allDatasetsStats.totalAverage.toFixed(
+          2
+        )}L\n- Daily Usage vs Average: ${Number(
+          summaryData.averageWaterUsage
+        ).toFixed(2)}L vs ${summaryData.allDatasetsStats.dailyAverage.toFixed(
+          2
+        )}L`;
       }
     }
     // Electricity
@@ -231,6 +195,23 @@ const ChatBot = ({ summaryData, type }) => {
       if (q.includes("tip") || q.includes("save") || q.includes("reduce")) {
         return `💡 Electricity Saving Tips:\n- ${electricityTips.join("\n- ")}`;
       }
+      // Add dataset comparison queries
+      if (q.includes("dataset comparison") || q.includes("compare datasets")) {
+        if (summaryData.allDatasetsStats?.datasetCount < 2) {
+          return "Not enough datasets available for comparison. Please upload more datasets.";
+        }
+        return `Dataset Comparison:\n- Total Usage vs Average: ${Number(
+          summaryData.totalElectricityConsumption
+        ).toFixed(
+          2
+        )} kWh vs ${summaryData.allDatasetsStats.totalAverage.toFixed(
+          2
+        )} kWh\n- Daily Usage vs Average: ${Number(
+          summaryData.averageElectricityUsage
+        ).toFixed(
+          2
+        )} kWh vs ${summaryData.allDatasetsStats.dailyAverage.toFixed(2)} kWh`;
+      }
     }
     // Help
     if (
@@ -238,9 +219,9 @@ const ChatBot = ({ summaryData, type }) => {
       q.includes("what can you do") ||
       q.includes("summary")
     ) {
-      return `You can ask me about any summary field (total, average, peak, appliance breakdown, most intensive, usage status, or tips) for the currently open dataset.`;
+      return "I can help you with:\n- Total usage\n- Daily average\n- Peak usage day\n- Appliance usage breakdown\n- Most intensive appliance\n- Usage status\n- Saving tips\n- Dataset comparison";
     }
-    return "Sorry, I didn't understand. Try asking about total, average, peak, appliance usage, most intensive appliance, usage status, or tips.";
+    return "Sorry, I didn't understand. Try asking about total, average, peak, appliance usage, most intensive appliance, usage status, tips, or dataset comparison.";
   };
 
   const handleKeyPress = (e) => {

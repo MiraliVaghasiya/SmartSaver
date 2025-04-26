@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import axiosInstance from "../utils/axios";
-import { Line, Bar, Scatter } from "react-chartjs-2";
-import * as XLSX from "xlsx";
+import { Line, Bar } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -14,9 +13,10 @@ import {
   Legend,
 } from "chart.js";
 import "./style/Summary.css";
-import { Doughnut } from "react-chartjs-2";
 import "./Analysis.css";
 import ElectricityMonthComparison from "./ElectricityMonthComparison";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
 ChartJS.register(
   CategoryScale,
@@ -125,6 +125,7 @@ const ElectricityAnalysis = ({
   selectedFilePath,
   setSummaryData,
   setSummaryType,
+  setAllDatasetsStats,
 }) => {
   const [file, setFile] = useState(null);
   const fileInputRef = useRef(null);
@@ -149,24 +150,10 @@ const ElectricityAnalysis = ({
     useState(defaultChartData);
   const [heaterData, setHeaterData] = useState(defaultChartData);
   const [lightsData, setLightsData] = useState(defaultChartData);
-  const [
-    electricityConsumptionByActivityData,
-    setElectricityConsumptionByActivityData,
-  ] = useState({
-    labels: [],
-    datasets: [
-      {
-        data: [],
-        backgroundColor: [],
-        borderColor: [],
-        borderWidth: 1,
-      },
-    ],
-  });
   const [datasets, setDatasets] = useState([]);
   const [summaryDataState, setSummaryDataState] = useState(null);
   const [showSummary, setShowSummary] = useState(false);
-  const [allDatasetsStats, setAllDatasetsStats] = useState({
+  const [allDatasetsStats, setAllDatasetsStatsState] = useState({
     totalAverage: 0,
     totalStdDev: 0,
     dailyAverage: 0,
@@ -180,11 +167,19 @@ const ElectricityAnalysis = ({
       lights: 0,
     },
   });
-  const [isOpen, setIsOpen] = useState(false);
+
+  const overviewChartRef = useRef(null);
+  const calendarRef = useRef(null);
+  const fanChartRef = useRef(null);
+  const refrigeratorChartRef = useRef(null);
+  const washingMachineChartRef = useRef(null);
+  const heaterChartRef = useRef(null);
+  const lightsChartRef = useRef(null);
 
   useEffect(() => {
     // Only fetch datasets on initial load
     fetchInitialData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const generateSummaryFromData = (analysisData) => {
@@ -359,14 +354,19 @@ const ElectricityAnalysis = ({
         applianceConsumptions.lights.length,
     };
 
-    setAllDatasetsStats({
+    const stats = {
       totalAverage: totalAvg,
       totalStdDev: totalStdDev,
       dailyAverage: dailyAvg,
       dailyStdDev: dailyStdDev,
       datasetCount: datasetsArray.length,
       applianceAverages,
-    });
+    };
+
+    setAllDatasetsStatsState(stats);
+    if (typeof setAllDatasetsStats === "function") {
+      setAllDatasetsStats(stats);
+    }
   };
 
   // Modify the fetchInitialData function to calculate stats
@@ -423,14 +423,6 @@ const ElectricityAnalysis = ({
     setWashingMachineData(analysisData.washingMachineData || defaultChartData);
     setHeaterData(analysisData.heaterData || defaultChartData);
     setLightsData(analysisData.lightsData || defaultChartData);
-    setElectricityConsumptionByActivityData(
-      analysisData.electricityConsumptionByActivityData || {
-        labels: [],
-        datasets: [
-          { data: [], backgroundColor: [], borderColor: [], borderWidth: 1 },
-        ],
-      }
-    );
 
     const generatedSummary = generateSummaryFromData(analysisData);
     setSummaryDataState(generatedSummary);
@@ -686,6 +678,475 @@ const ElectricityAnalysis = ({
     console.log("Comparison results:", results);
   };
 
+  // Helper function to generate recommendations for electricity
+  const generateRecommendations = (categoryTotals, dailyTotals, avgUsage) => {
+    const recommendations = [];
+
+    // Analyze peak usage
+    const peakDays = dailyTotals.filter((h) => h.total > avgUsage * 1.5);
+    if (peakDays.length > 0) {
+      recommendations.push(
+        "Consider spreading out electricity usage to avoid peak consumption days."
+      );
+    }
+
+    // Analyze category usage
+    Object.entries(categoryTotals).forEach(([category, value]) => {
+      const percentage =
+        (value / dailyTotals.reduce((sum, h) => sum + h.total, 0)) * 100;
+      if (percentage > 40) {
+        recommendations.push(
+          `High ${category} usage detected (${percentage.toFixed(
+            1
+          )}%) - Consider implementing ${category.toLowerCase()}-specific energy-saving measures.`
+        );
+      }
+    });
+
+    // Add general recommendations
+    recommendations.push(
+      "Switch to energy-efficient appliances where possible.",
+      "Turn off lights and appliances when not in use.",
+      "Unplug devices to avoid phantom loads.",
+      "Use LED bulbs for lighting.",
+      "Consider using smart plugs or timers for major appliances.",
+      "Monitor usage patterns and adjust habits accordingly."
+    );
+
+    return recommendations;
+  };
+
+  // PDF Report Generation for Electricity
+  const generatePDFReport = async () => {
+    if (!chartData || !chartData.datasets || !chartData.labels) {
+      alert("No data available to generate report");
+      return;
+    }
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    let yPos = 20;
+    const lineHeight = 7;
+    const graphWidth = pageWidth - 2 * margin;
+    const graphHeight = 100;
+    const checkPageBreak = (extra = 0) => {
+      if (yPos + extra > pageHeight - margin) {
+        doc.addPage();
+        yPos = margin;
+      }
+    };
+
+    // Get month and year from the first label
+    const firstLabel = chartData.labels[0];
+    const parts = firstLabel.includes("-")
+      ? firstLabel.split("-")
+      : firstLabel.split("/");
+    const month = parseInt(parts[1]);
+    const year = parseInt(parts[2]) || 2024;
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+
+    // Title
+    doc.setFontSize(24);
+    doc.text("Electricity Consumption Analysis Report", pageWidth / 2, yPos, {
+      align: "center",
+    });
+    yPos += 15;
+    doc.setFontSize(18);
+    doc.text(`${monthNames[month - 1]} ${year}`, pageWidth / 2, yPos, {
+      align: "center",
+    });
+    yPos += 20;
+
+    // Calculate total electricity consumption and other metrics
+    const totalElectricity = chartData.datasets.reduce((total, dataset) => {
+      if (!dataset || !dataset.data) return total;
+      return (
+        total + dataset.data.reduce((sum, val) => sum + (Number(val) || 0), 0)
+      );
+    }, 0);
+
+    const dailyTotals = chartData.labels.map((date, index) => ({
+      date,
+      total: chartData.datasets.reduce((sum, dataset) => {
+        if (!dataset || !dataset.data || !dataset.data[index]) return sum;
+        return sum + (Number(dataset.data[index]) || 0);
+      }, 0),
+    }));
+
+    const sortedDailyTotals = [...dailyTotals].sort(
+      (a, b) => b.total - a.total
+    );
+    const top5HighDays = sortedDailyTotals.slice(0, 5);
+    const top5LowDays = sortedDailyTotals.slice(-5).reverse();
+
+    // Category-wise totals
+    const categoryTotals = {
+      Fan:
+        fanData?.datasets?.[0]?.data?.reduce(
+          (sum, val) => sum + (Number(val) || 0),
+          0
+        ) || 0,
+      Refrigerator:
+        refrigeratorData?.datasets?.[0]?.data?.reduce(
+          (sum, val) => sum + (Number(val) || 0),
+          0
+        ) || 0,
+      "Washing Machine":
+        washingMachineData?.datasets?.[0]?.data?.reduce(
+          (sum, val) => sum + (Number(val) || 0),
+          0
+        ) || 0,
+      Heater:
+        heaterData?.datasets?.[0]?.data?.reduce(
+          (sum, val) => sum + (Number(val) || 0),
+          0
+        ) || 0,
+      Lights:
+        lightsData?.datasets?.[0]?.data?.reduce(
+          (sum, val) => sum + (Number(val) || 0),
+          0
+        ) || 0,
+    };
+
+    // 1. Total Electricity Consumption
+    checkPageBreak(20);
+    doc.setFontSize(16);
+    doc.text("1. Total Electricity Consumption", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    doc.text(
+      `Total Electricity Consumption: ${totalElectricity.toFixed(2)} kWh`,
+      margin,
+      yPos
+    );
+    yPos += 15;
+
+    // Add Overview Line Chart
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Total Electricity Usage Over Time", margin, yPos);
+    yPos += 10;
+    if (overviewChartRef.current) {
+      const overviewImg = await html2canvas(overviewChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(overviewImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // Add Calendar Visualization
+    checkPageBreak(graphHeight + 40);
+    doc.setFontSize(14);
+    doc.text("Monthly Usage Calendar", margin, yPos);
+    yPos += 10;
+    if (calendarRef.current) {
+      const calendarImg = await html2canvas(calendarRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(
+        calendarImg,
+        "PNG",
+        margin,
+        yPos,
+        graphWidth,
+        graphHeight + 40
+      );
+      yPos += graphHeight + 50;
+    }
+
+    // 2. Category-wise Usage
+    checkPageBreak(20 + Object.keys(categoryTotals).length * lineHeight);
+    doc.setFontSize(16);
+    doc.text("2. Category-wise Usage", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    Object.entries(categoryTotals).forEach(([category, value]) => {
+      checkPageBreak(lineHeight);
+      const percentage = ((value / totalElectricity) * 100).toFixed(2);
+      doc.text(
+        `${category}: ${value.toFixed(2)} kWh (${percentage}% of total)`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+    });
+    yPos += 10;
+
+    // Add Fan Usage Chart
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Fan Usage", margin, yPos);
+    yPos += 10;
+    if (fanChartRef.current) {
+      const fanImg = await html2canvas(fanChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(fanImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // Add Refrigerator Usage Chart
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Refrigerator Usage", margin, yPos);
+    yPos += 10;
+    if (refrigeratorChartRef.current) {
+      const refrigeratorImg = await html2canvas(refrigeratorChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(
+        refrigeratorImg,
+        "PNG",
+        margin,
+        yPos,
+        graphWidth,
+        graphHeight
+      );
+      yPos += graphHeight + 20;
+    }
+
+    // Add Washing Machine Usage Chart
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Washing Machine Usage", margin, yPos);
+    yPos += 10;
+    if (washingMachineChartRef.current) {
+      const washingImg = await html2canvas(washingMachineChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(washingImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // Add Heater Usage Chart
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Heater Usage", margin, yPos);
+    yPos += 10;
+    if (heaterChartRef.current) {
+      const heaterImg = await html2canvas(heaterChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(heaterImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // Add Lights Usage Chart
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Lights Usage", margin, yPos);
+    yPos += 10;
+    if (lightsChartRef.current) {
+      const lightsImg = await html2canvas(lightsChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(lightsImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // 3. Top 5 High Consumption Days
+    checkPageBreak(20 + top5HighDays.length * lineHeight);
+    doc.setFontSize(16);
+    doc.text("3. Top 5 High Consumption Days", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    top5HighDays.forEach((day, index) => {
+      checkPageBreak(lineHeight);
+      doc.text(
+        `${index + 1}. ${day.date}: ${day.total.toFixed(2)} kWh`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+    });
+    yPos += 10;
+
+    // 4. Top 5 Low Consumption Days
+    checkPageBreak(20 + top5LowDays.length * lineHeight);
+    doc.setFontSize(16);
+    doc.text("4. Top 5 Low Consumption Days", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    top5LowDays.forEach((day, index) => {
+      checkPageBreak(lineHeight);
+      doc.text(
+        `${index + 1}. ${day.date}: ${day.total.toFixed(2)} kWh`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+    });
+    yPos += 10;
+
+    // 5. Zero Consumption Days
+    checkPageBreak(20);
+    doc.setFontSize(16);
+    doc.text("5. Zero Consumption Days", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    const zeroDays = dailyTotals
+      .filter((h) => h.total === 0)
+      .map((h) => h.date);
+    doc.text(
+      `Days with no electricity usage: ${zeroDays.join(", ") || "None"}`,
+      margin,
+      yPos
+    );
+    yPos += 15;
+
+    // 6. Average Electricity Usage
+    checkPageBreak(20);
+    doc.setFontSize(16);
+    doc.text("6. Average Electricity Usage", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    const avgUsage = totalElectricity / (chartData.labels.length || 1);
+    doc.text(
+      `Average Electricity Usage per Day: ${avgUsage.toFixed(2)} kWh`,
+      margin,
+      yPos
+    );
+    yPos += 15;
+
+    // 7. Percentage Contribution by Appliance
+    checkPageBreak(20 + Object.keys(categoryTotals).length * lineHeight);
+    doc.setFontSize(16);
+    doc.text("7. Percentage Contribution by Appliance", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    Object.entries(categoryTotals).forEach(([category, value]) => {
+      checkPageBreak(lineHeight);
+      const percentage = ((value / totalElectricity) * 100).toFixed(2);
+      doc.text(`${category}: ${percentage}%`, margin, yPos);
+      yPos += lineHeight;
+    });
+    yPos += 15;
+
+    // 8. Comparative Analysis
+    checkPageBreak(30);
+    doc.setFontSize(16);
+    doc.text("8. Comparative Analysis", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    if (allDatasetsStats.datasetCount > 1) {
+      doc.text(
+        `Total Usage vs Average: ${totalElectricity.toFixed(
+          2
+        )}kWh vs ${allDatasetsStats.totalAverage.toFixed(2)}kWh`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+      doc.text(
+        `Daily Usage vs Average: ${avgUsage.toFixed(
+          2
+        )}kWh vs ${allDatasetsStats.dailyAverage.toFixed(2)}kWh`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+      const difference = (
+        ((totalElectricity - allDatasetsStats.totalAverage) /
+          allDatasetsStats.totalAverage) *
+        100
+      ).toFixed(2);
+      doc.text(`Difference from Average: ${difference}%`, margin, yPos);
+      yPos += lineHeight;
+    } else {
+      doc.text("Not enough data for comparative analysis", margin, yPos);
+      yPos += lineHeight;
+    }
+    yPos += 10;
+
+    // 9. Next Month's Electricity Requirement Forecast
+    checkPageBreak(30);
+    doc.setFontSize(16);
+    doc.text("9. Next Month's Electricity Requirement Forecast", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    const lastThreeMonths = datasets.slice(0, 3);
+    if (lastThreeMonths.length > 0) {
+      const forecast =
+        lastThreeMonths.reduce((sum, dataset) => {
+          const total =
+            dataset.analysis?.chartData?.datasets?.reduce((acc, ds) => {
+              if (!ds || !ds.data) return acc;
+              return (
+                acc + ds.data.reduce((sum, val) => sum + (Number(val) || 0), 0)
+              );
+            }, 0) || 0;
+          return sum + total;
+        }, 0) / lastThreeMonths.length;
+      doc.text(
+        `Forecasted Electricity Usage: ${forecast.toFixed(2)} kWh`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+      doc.text(
+        `Based on ${lastThreeMonths.length} previous month(s) of data`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+    } else {
+      doc.text("Not enough historical data for forecasting", margin, yPos);
+      yPos += lineHeight;
+    }
+    yPos += 10;
+
+    // 10. Recommendations
+    checkPageBreak(20);
+    doc.setFontSize(16);
+    doc.text("10. Recommendations", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    const recommendations = generateRecommendations(
+      categoryTotals,
+      dailyTotals,
+      avgUsage
+    );
+    recommendations.forEach((rec) => {
+      checkPageBreak(lineHeight);
+      doc.text(`• ${rec}`, margin, yPos);
+      yPos += lineHeight;
+    });
+
+    // Save the PDF
+    doc.save(
+      `electricity_consumption_analysis_${monthNames[month - 1]}_${year}.pdf`
+    );
+  };
+
   return (
     <div className="electricity-analysis-container">
       <ElectricityMonthComparison
@@ -693,10 +1154,19 @@ const ElectricityAnalysis = ({
         onCompare={handleComparisonResults}
       />
 
+      <div className="download-section">
+        <button
+          className="download-button"
+          onClick={generatePDFReport}
+          disabled={
+            !chartData || !chartData.labels || chartData.labels.length === 0
+          }
+        ></button>
+      </div>
+
       <h1>Electricity Analysis</h1>
       <div className="analysis-controls">
         <div className="dataset-selector">
-          <label htmlFor="dataset-select">Select Dataset:</label>
           <select
             id="dataset-select"
             value={selectedDataset || ""}
@@ -846,6 +1316,7 @@ const ElectricityAnalysis = ({
                       paddingBottom: "20px",
                       height: "calc(100% - 80px)",
                     }}
+                    ref={overviewChartRef}
                   >
                     {chartData && chartData.labels && (
                       <Line
@@ -1030,40 +1501,42 @@ const ElectricityAnalysis = ({
               </p>
               {chartData && chartData.labels && chartData.labels.length > 0 && (
                 <>
-                  <Calendar
-                    data={(() => {
-                      const dailyData = {};
-                      chartData.labels.forEach((label, index) => {
-                        const parts = label.includes("-")
-                          ? label.split("-")
-                          : label.split("/");
-                        const day = parseInt(parts[0]);
-                        if (
-                          !isNaN(day) &&
-                          chartData.datasets[0].data[index] !== undefined
-                        ) {
-                          dailyData[day] = parseFloat(
-                            chartData.datasets[0].data[index]
-                          );
-                        }
-                      });
-                      return dailyData;
-                    })()}
-                    month={(() => {
-                      const firstLabel = chartData.labels[0];
-                      const parts = firstLabel.includes("-")
-                        ? firstLabel.split("-")
-                        : firstLabel.split("/");
-                      return parseInt(parts[1]) || 1;
-                    })()}
-                    year={(() => {
-                      const firstLabel = chartData.labels[0];
-                      const parts = firstLabel.includes("-")
-                        ? firstLabel.split("-")
-                        : firstLabel.split("/");
-                      return parseInt(parts[2]) || new Date().getFullYear();
-                    })()}
-                  />
+                  <div ref={calendarRef}>
+                    <Calendar
+                      data={(() => {
+                        const dailyData = {};
+                        chartData.labels.forEach((label, index) => {
+                          const parts = label.includes("-")
+                            ? label.split("-")
+                            : label.split("/");
+                          const day = parseInt(parts[0]);
+                          if (
+                            !isNaN(day) &&
+                            chartData.datasets[0].data[index] !== undefined
+                          ) {
+                            dailyData[day] = parseFloat(
+                              chartData.datasets[0].data[index]
+                            );
+                          }
+                        });
+                        return dailyData;
+                      })()}
+                      month={(() => {
+                        const firstLabel = chartData.labels[0];
+                        const parts = firstLabel.includes("-")
+                          ? firstLabel.split("-")
+                          : firstLabel.split("/");
+                        return parseInt(parts[1]) || 1;
+                      })()}
+                      year={(() => {
+                        const firstLabel = chartData.labels[0];
+                        const parts = firstLabel.includes("-")
+                          ? firstLabel.split("-")
+                          : firstLabel.split("/");
+                        return parseInt(parts[2]) || new Date().getFullYear();
+                      })()}
+                    />
+                  </div>
                   <div
                     style={{
                       display: "flex",
@@ -1119,9 +1592,18 @@ const ElectricityAnalysis = ({
             <div className="section-content">
               <div style={{ display: "flex", marginBottom: "20px" }}>
                 <div style={{ width: "50%" }}>
-                  <div className="inner-row">
+                  <div className="inner-row" ref={fanChartRef}>
+                    <h3>Fan Usage</h3>
+                    <p>Power consumption for cooling and ventilation.</p>
+                    {fanData && fanData.labels && fanData.datasets && (
+                      <Bar key={JSON.stringify(fanData)} data={fanData} />
+                    )}
+                  </div>
+                </div>
+                <div style={{ width: "50%" }}>
+                  <div className="inner-row" ref={refrigeratorChartRef}>
                     <h3>Refrigerator Usage</h3>
-                    <p>Continuous power consumption of the refrigerator.</p>
+                    <p>Power consumption for refrigeration.</p>
                     {refrigeratorData &&
                       refrigeratorData.labels &&
                       refrigeratorData.datasets && (
@@ -1132,10 +1614,12 @@ const ElectricityAnalysis = ({
                       )}
                   </div>
                 </div>
+              </div>
+              <div style={{ display: "flex", marginBottom: "20px" }}>
                 <div style={{ width: "50%" }}>
-                  <div className="inner-row">
+                  <div className="inner-row" ref={washingMachineChartRef}>
                     <h3>Washing Machine Usage</h3>
-                    <p>Power consumption during washing cycles.</p>
+                    <p>Power consumption for laundry cycles.</p>
                     {washingMachineData &&
                       washingMachineData.labels &&
                       washingMachineData.datasets && (
@@ -1146,17 +1630,8 @@ const ElectricityAnalysis = ({
                       )}
                   </div>
                 </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Climate Control Section */}
-          <div className="analysis-section">
-            <h2 className="section-title">Climate Control</h2>
-            <div className="section-content">
-              <div style={{ display: "flex", marginBottom: "20px" }}>
                 <div style={{ width: "50%" }}>
-                  <div className="inner-row">
+                  <div className="inner-row" ref={heaterChartRef}>
                     <h3>Heater Usage</h3>
                     <p>Power consumption for heating.</p>
                     {heaterData && heaterData.labels && heaterData.datasets && (
@@ -1164,26 +1639,10 @@ const ElectricityAnalysis = ({
                     )}
                   </div>
                 </div>
-                <div style={{ width: "50%" }}>
-                  <div className="inner-row">
-                    <h3>Fan Usage</h3>
-                    <p>Power consumption for cooling and ventilation.</p>
-                    {fanData && fanData.labels && fanData.datasets && (
-                      <Bar key={JSON.stringify(fanData)} data={fanData} />
-                    )}
-                  </div>
-                </div>
               </div>
-            </div>
-          </div>
-
-          {/* Lighting Section */}
-          <div className="analysis-section">
-            <h2 className="section-title">Lighting</h2>
-            <div className="section-content">
               <div style={{ display: "flex", marginBottom: "20px" }}>
                 <div style={{ width: "50%" }}>
-                  <div className="inner-row">
+                  <div className="inner-row" ref={lightsChartRef}>
                     <h3>Lighting Usage</h3>
                     <p>Power consumption for all lighting fixtures.</p>
                     {lightsData && lightsData.labels && lightsData.datasets && (

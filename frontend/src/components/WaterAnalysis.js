@@ -26,7 +26,10 @@ import {
 import "./style/Summary.css";
 import MonthComparison from "./MonthComparison";
 import "./Analysis.css";
+import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 
+// Register Chart.js components
 ChartJS.register(
   CategoryScale,
   LinearScale,
@@ -39,6 +42,9 @@ ChartJS.register(
   ArcElement,
   RadialLinearScale
 );
+
+// Create a Chart constructor for use in the PDF generation
+const Chart = ChartJS;
 
 // Add Calendar component
 const Calendar = ({ data, month, year }) => {
@@ -130,7 +136,12 @@ const Calendar = ({ data, month, year }) => {
   );
 };
 
-const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
+const WaterAnalysis = ({
+  setWaterData,
+  setSummaryData,
+  setSummaryType,
+  setAllDatasetsStats,
+}) => {
   const [file, setFile] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [drinkingData, setDrinkingData] = useState(null);
@@ -164,14 +175,24 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
   });
   const [showSummary, setShowSummary] = useState(false);
   const fileInputRef = React.useRef(null);
-  const [allDatasetsStats, setAllDatasetsStats] = useState({
+  const [allDatasetsStats, setAllDatasetsStatsState] = useState({
     totalAverage: 0,
     totalStdDev: 0,
     dailyAverage: 0,
     dailyStdDev: 0,
     datasetCount: 0,
+    applianceAverages: {},
   });
   const [isOpen, setIsOpen] = useState(false);
+  const overviewChartRef = useRef(null);
+  const pieChartRef = useRef(null);
+  const barChartRef = useRef(null);
+  const showerChartRef = useRef(null);
+  const toiletChartRef = useRef(null);
+  const dishwasherChartRef = useRef(null);
+  const sinkChartRef = useRef(null);
+  const washingMachineChartRef = useRef(null);
+  const calendarRef = useRef(null);
 
   useEffect(() => {
     // Fetch water datasets for the current user when component mounts
@@ -549,6 +570,7 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
 
     let totalConsumptions = [];
     let dailyConsumptions = [];
+    let applianceAverages = {};
 
     // Collect consumption data from all datasets
     datasetsArray.forEach((dataset) => {
@@ -562,6 +584,25 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
 
         totalConsumptions.push(total);
         dailyConsumptions.push(daily);
+
+        // Collect appliance-specific averages
+        const applianceData =
+          dataset.analysis.chartData.datasets[0].data.reduce(
+            (acc, value, index) => {
+              const label = dataset.analysis.chartData.labels[index];
+              const parts = label.includes("-")
+                ? label.split("-")
+                : label.split("/");
+              const day = parseInt(parts[0]);
+              const month = parseInt(parts[1]);
+              const year = parseInt(parts[2]) || 2024;
+
+              acc[day] = value;
+              return acc;
+            },
+            {}
+          );
+        applianceAverages = { ...applianceAverages, ...applianceData };
       }
     });
 
@@ -581,12 +622,13 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
         dailyConsumptions.length
     );
 
-    setAllDatasetsStats({
+    setAllDatasetsStatsState({
       totalAverage: totalAvg,
       totalStdDev: totalStdDev,
       dailyAverage: dailyAvg,
       dailyStdDev: dailyStdDev,
       datasetCount: datasetsArray.length,
+      applianceAverages,
     });
   };
 
@@ -622,12 +664,540 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
     console.log("Comparison results:", results);
   };
 
+  const generatePDFReport = async () => {
+    if (!chartData || !chartData.datasets || !chartData.labels) {
+      alert("No data available to generate report");
+      return;
+    }
+
+    const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    let yPos = 20;
+    const lineHeight = 7;
+    const graphWidth = pageWidth - 2 * margin;
+    const graphHeight = 100;
+
+    // Helper to handle page breaks
+    const checkPageBreak = (extra = 0) => {
+      if (yPos + extra > pageHeight - margin) {
+        doc.addPage();
+        yPos = margin;
+      }
+    };
+
+    // Get month and year from the first label
+    const firstLabel = chartData.labels[0];
+    const parts = firstLabel.includes("-")
+      ? firstLabel.split("-")
+      : firstLabel.split("/");
+    const month = parseInt(parts[1]);
+    const year = parseInt(parts[2]) || 2024;
+    const monthNames = [
+      "January",
+      "February",
+      "March",
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+    ];
+
+    // Title with Month and Year
+    doc.setFontSize(24);
+    doc.text("Water Consumption Analysis Report", pageWidth / 2, yPos, {
+      align: "center",
+    });
+    yPos += 15;
+    doc.setFontSize(18);
+    doc.text(`${monthNames[month - 1]} ${year}`, pageWidth / 2, yPos, {
+      align: "center",
+    });
+    yPos += 20;
+
+    // Calculate total water consumption and other metrics
+    const totalWater = chartData.datasets.reduce((total, dataset) => {
+      if (!dataset || !dataset.data) return total;
+      return (
+        total + dataset.data.reduce((sum, val) => sum + (Number(val) || 0), 0)
+      );
+    }, 0);
+
+    const hourlyTotals = chartData.labels.map((date, index) => ({
+      date,
+      total: chartData.datasets.reduce((sum, dataset) => {
+        if (!dataset || !dataset.data || !dataset.data[index]) return sum;
+        return sum + (Number(dataset.data[index]) || 0);
+      }, 0),
+    }));
+
+    // Sort hourly totals for high and low consumption days
+    const sortedHourlyTotals = [...hourlyTotals].sort(
+      (a, b) => b.total - a.total
+    );
+    const top5HighDays = sortedHourlyTotals.slice(0, 5);
+    const top5LowDays = sortedHourlyTotals.slice(-5).reverse();
+
+    // Calculate category-wise totals with proper names
+    const categoryTotals = {
+      Bathing:
+        bathingData?.datasets?.[0]?.data?.reduce(
+          (sum, val) => sum + (Number(val) || 0),
+          0
+        ) || 0,
+      Drinking:
+        drinkingData?.datasets?.[0]?.data?.reduce(
+          (sum, val) => sum + (Number(val) || 0),
+          0
+        ) || 0,
+      Cooking:
+        cookingData?.datasets?.[0]?.data?.reduce(
+          (sum, val) => sum + (Number(val) || 0),
+          0
+        ) || 0,
+      "Washing Clothes":
+        washingClothesData?.datasets?.[0]?.data?.reduce(
+          (sum, val) => sum + (Number(val) || 0),
+          0
+        ) || 0,
+      Dishwashing:
+        dishwashingData?.datasets?.[0]?.data?.reduce(
+          (sum, val) => sum + (Number(val) || 0),
+          0
+        ) || 0,
+    };
+
+    // 1. Total Water Consumption
+    checkPageBreak(20);
+    doc.setFontSize(16);
+    doc.text("1. Total Water Consumption", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    doc.text(
+      `Total Water Consumption: ${totalWater.toFixed(2)} Liters`,
+      margin,
+      yPos
+    );
+    yPos += 15;
+
+    // Add Total Water Usage Graph (capture from ref)
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Total Water Usage Over Time", margin, yPos);
+    yPos += 10;
+    let overviewImg = null;
+    if (overviewChartRef.current) {
+      overviewImg = await html2canvas(overviewChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(overviewImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // 2. Category-wise Usage
+    checkPageBreak(20 + Object.keys(categoryTotals).length * lineHeight);
+    doc.setFontSize(16);
+    doc.text("2. Category-wise Usage", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    Object.entries(categoryTotals).forEach(([category, value]) => {
+      checkPageBreak(lineHeight);
+      const percentage = ((value / totalWater) * 100).toFixed(2);
+      doc.text(
+        `${category}: ${value.toFixed(2)} Liters (${percentage}% of total)`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+    });
+    yPos += 10;
+
+    // Add Category-wise Usage Pie Chart (capture from ref)
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Water Usage by Category", margin, yPos);
+    yPos += 10;
+    let pieImg = null;
+    if (pieChartRef.current) {
+      pieImg = await html2canvas(pieChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(pieImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // 3. Top 5 High Consumption Days
+    checkPageBreak(20 + top5HighDays.length * lineHeight);
+    doc.setFontSize(16);
+    doc.text("3. Top 5 High Consumption Days", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    top5HighDays.forEach((day, index) => {
+      checkPageBreak(lineHeight);
+      doc.text(
+        `${index + 1}. ${day.date}: ${day.total.toFixed(2)} Liters`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+    });
+    yPos += 10;
+
+    // 4. Top 5 Low Consumption Days
+    checkPageBreak(20 + top5LowDays.length * lineHeight);
+    doc.setFontSize(16);
+    doc.text("4. Top 5 Low Consumption Days", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    top5LowDays.forEach((day, index) => {
+      checkPageBreak(lineHeight);
+      doc.text(
+        `${index + 1}. ${day.date}: ${day.total.toFixed(2)} Liters`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+    });
+    yPos += 10;
+
+    // 5. Zero Consumption Days
+    checkPageBreak(20);
+    doc.setFontSize(16);
+    doc.text("5. Zero Consumption Days", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    const zeroDays = hourlyTotals
+      .filter((h) => h.total === 0)
+      .map((h) => h.date);
+    doc.text(
+      `Days with no water usage: ${zeroDays.join(", ") || "None"}`,
+      margin,
+      yPos
+    );
+    yPos += 15;
+
+    // 6. Average Water Usage
+    checkPageBreak(20);
+    doc.setFontSize(16);
+    doc.text("6. Average Water Usage", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    const avgUsage = totalWater / (chartData.labels.length || 1);
+    doc.text(
+      `Average Water Usage per Day: ${avgUsage.toFixed(2)} Liters`,
+      margin,
+      yPos
+    );
+    yPos += 15;
+
+    // Add Daily Usage Bar Chart (capture from ref)
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Daily Water Usage", margin, yPos);
+    yPos += 10;
+    let barImg = null;
+    if (barChartRef.current) {
+      barImg = await html2canvas(barChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(barImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // 7. Percentage Contribution by Activity
+    checkPageBreak(20 + Object.keys(categoryTotals).length * lineHeight);
+    doc.setFontSize(16);
+    doc.text("7. Percentage Contribution by Activity", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    Object.entries(categoryTotals).forEach(([category, value]) => {
+      checkPageBreak(lineHeight);
+      const percentage = ((value / totalWater) * 100).toFixed(2);
+      doc.text(`${category}: ${percentage}%`, margin, yPos);
+      yPos += lineHeight;
+    });
+    yPos += 15;
+
+    // 8. Comparative Analysis
+    checkPageBreak(30);
+    doc.setFontSize(16);
+    doc.text("8. Comparative Analysis", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    if (allDatasetsStats.datasetCount > 1) {
+      doc.text(
+        `Total Usage vs Average: ${totalWater.toFixed(
+          2
+        )}L vs ${allDatasetsStats.totalAverage.toFixed(2)}L`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+      doc.text(
+        `Daily Usage vs Average: ${avgUsage.toFixed(
+          2
+        )}L vs ${allDatasetsStats.dailyAverage.toFixed(2)}L`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+      const difference = (
+        ((totalWater - allDatasetsStats.totalAverage) /
+          allDatasetsStats.totalAverage) *
+        100
+      ).toFixed(2);
+      doc.text(`Difference from Average: ${difference}%`, margin, yPos);
+      yPos += lineHeight;
+    } else {
+      doc.text("Not enough data for comparative analysis", margin, yPos);
+      yPos += lineHeight;
+    }
+    yPos += 10;
+
+    // 9. Next Month's Water Requirement Forecast
+    checkPageBreak(30);
+    doc.setFontSize(16);
+    doc.text("9. Next Month's Water Requirement Forecast", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    const lastThreeMonths = datasets.slice(0, 3);
+    if (lastThreeMonths.length > 0) {
+      const forecast =
+        lastThreeMonths.reduce((sum, dataset) => {
+          const total =
+            dataset.analysis?.chartData?.datasets?.reduce((acc, ds) => {
+              if (!ds || !ds.data) return acc;
+              return (
+                acc + ds.data.reduce((sum, val) => sum + (Number(val) || 0), 0)
+              );
+            }, 0) || 0;
+          return sum + total;
+        }, 0) / lastThreeMonths.length;
+      doc.text(
+        `Forecasted Water Usage: ${forecast.toFixed(2)} Liters`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+      doc.text(
+        `Based on ${lastThreeMonths.length} previous month(s) of data`,
+        margin,
+        yPos
+      );
+      yPos += lineHeight;
+    } else {
+      doc.text("Not enough historical data for forecasting", margin, yPos);
+      yPos += lineHeight;
+    }
+    yPos += 10;
+
+    // 10. Recommendations
+    checkPageBreak(20);
+    doc.setFontSize(16);
+    doc.text("10. Recommendations", margin, yPos);
+    yPos += 10;
+    doc.setFontSize(12);
+    const recommendations = generateRecommendations(
+      categoryTotals,
+      hourlyTotals,
+      avgUsage
+    );
+    recommendations.forEach((rec) => {
+      checkPageBreak(lineHeight);
+      doc.text(`• ${rec}`, margin, yPos);
+      yPos += lineHeight;
+    });
+
+    // Add Shower Usage Chart
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Shower Usage", margin, yPos);
+    yPos += 10;
+    if (showerChartRef.current) {
+      const showerImg = await html2canvas(showerChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(showerImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // Add Toilet Usage Chart
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Toilet Usage", margin, yPos);
+    yPos += 10;
+    if (toiletChartRef.current) {
+      const toiletImg = await html2canvas(toiletChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(toiletImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // Add Dishwasher Usage Chart
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Dishwasher Usage", margin, yPos);
+    yPos += 10;
+    if (dishwasherChartRef.current) {
+      const dishwasherImg = await html2canvas(dishwasherChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(dishwasherImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // Add Sink Usage Chart
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Sink Usage", margin, yPos);
+    yPos += 10;
+    if (sinkChartRef.current) {
+      const sinkImg = await html2canvas(sinkChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(sinkImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // Add Washing Machine Usage Chart
+    checkPageBreak(graphHeight + 20);
+    doc.setFontSize(14);
+    doc.text("Washing Machine Usage", margin, yPos);
+    yPos += 10;
+    if (washingMachineChartRef.current) {
+      const washingImg = await html2canvas(washingMachineChartRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(washingImg, "PNG", margin, yPos, graphWidth, graphHeight);
+      yPos += graphHeight + 20;
+    }
+
+    // Add Calendar Visualization
+    checkPageBreak(graphHeight + 40);
+    doc.setFontSize(14);
+    doc.text("Monthly Usage Calendar", margin, yPos);
+    yPos += 10;
+    if (calendarRef.current) {
+      const calendarImg = await html2canvas(calendarRef.current, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: "#ffffff",
+      });
+      doc.addImage(
+        calendarImg,
+        "PNG",
+        margin,
+        yPos,
+        graphWidth,
+        graphHeight + 40
+      );
+      yPos += graphHeight + 50;
+    }
+
+    // Save the PDF
+    doc.save(`water_consumption_analysis_${monthNames[month - 1]}_${year}.pdf`);
+  };
+
+  // Helper function to analyze trends
+  const analyzeTrends = (hourlyTotals) => {
+    const nonZeroTotals = hourlyTotals.filter((h) => h.total > 0);
+    const avg =
+      nonZeroTotals.reduce((sum, h) => sum + h.total, 0) / nonZeroTotals.length;
+    const variance =
+      nonZeroTotals.reduce((sum, h) => sum + Math.pow(h.total - avg, 2), 0) /
+      nonZeroTotals.length;
+    const stdDev = Math.sqrt(variance);
+
+    let trend = "Stable";
+    if (stdDev > avg * 0.5) {
+      trend = "Highly Variable";
+    } else if (stdDev > avg * 0.2) {
+      trend = "Moderately Variable";
+    }
+
+    return (
+      `Usage Pattern: ${trend}\n` +
+      `Average Daily Usage: ${avg.toFixed(2)} Liters\n` +
+      `Standard Deviation: ${stdDev.toFixed(2)} Liters\n` +
+      `Days with Zero Usage: ${
+        hourlyTotals.filter((h) => h.total === 0).length
+      }`
+    );
+  };
+
+  // Helper function to generate recommendations
+  const generateRecommendations = (categoryTotals, hourlyTotals, avgUsage) => {
+    const recommendations = [];
+
+    // Analyze peak usage
+    const peakHours = hourlyTotals.filter((h) => h.total > avgUsage * 1.5);
+    if (peakHours.length > 0) {
+      recommendations.push(
+        "Consider spreading out water usage to avoid peak consumption periods"
+      );
+    }
+
+    // Analyze category usage
+    Object.entries(categoryTotals).forEach(([category, value]) => {
+      const percentage =
+        (value / hourlyTotals.reduce((sum, h) => sum + h.total, 0)) * 100;
+      if (percentage > 40) {
+        recommendations.push(
+          `High ${category} usage detected (${percentage.toFixed(
+            1
+          )}%) - Consider implementing ${category.toLowerCase()}-specific conservation measures`
+        );
+      }
+    });
+
+    // Add general recommendations
+    recommendations.push(
+      "Consider installing water-efficient fixtures",
+      "Regular maintenance of water systems to prevent leaks",
+      "Consider rainwater harvesting for non-potable uses",
+      "Monitor usage patterns and adjust habits accordingly"
+    );
+
+    return recommendations;
+  };
+
   return (
     <div className="water-analysis-container">
       <MonthComparison
         datasets={datasets}
         onCompare={handleComparisonResults}
       />
+
+      <div className="download-section">
+        <button
+          className="download-button"
+          onClick={generatePDFReport}
+          disabled={!chartData}
+        ></button>
+      </div>
 
       <h1>Water Analysis</h1>
       <div className="analysis-controls">
@@ -727,7 +1297,7 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
                   This graph shows the breakdown of water consumption by
                   different utilities over time.
                 </p>
-                <div className="total-water-usage-graph">
+                <div className="total-water-usage-graph" ref={overviewChartRef}>
                   {chartData && chartData.labels && (
                     <Line
                       data={{
@@ -885,10 +1455,10 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
                         },
                       }}
                       style={{
-                        height: "400px", // Fixed smaller height
+                        height: "400px",
                         width: "100%",
                         background: "white",
-                        padding: "15px", // Reduced padding
+                        padding: "15px",
                         borderRadius: "8px",
                         boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
                       }}
@@ -907,40 +1477,42 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
               </p>
               {chartData && chartData.labels && (
                 <>
-                  <Calendar
-                    data={chartData.datasets[0].data.reduce(
-                      (acc, value, index) => {
-                        // Parse the date from the label (assuming format: "DD-MM-YYYY" or "DD/MM/YYYY")
-                        const label = chartData.labels[index];
-                        const parts = label.includes("-")
-                          ? label.split("-")
-                          : label.split("/");
-                        const day = parseInt(parts[0]);
-                        const month = parseInt(parts[1]);
-                        const year = parseInt(parts[2]) || 2024;
+                  <div ref={calendarRef}>
+                    <Calendar
+                      data={chartData.datasets[0].data.reduce(
+                        (acc, value, index) => {
+                          // Parse the date from the label (assuming format: "DD-MM-YYYY" or "DD/MM/YYYY")
+                          const label = chartData.labels[index];
+                          const parts = label.includes("-")
+                            ? label.split("-")
+                            : label.split("/");
+                          const day = parseInt(parts[0]);
+                          const month = parseInt(parts[1]);
+                          const year = parseInt(parts[2]) || 2024;
 
-                        acc[day] = value;
-                        return acc;
-                      },
-                      {}
-                    )}
-                    month={(() => {
-                      // Get month from the first label
-                      const firstLabel = chartData.labels[0];
-                      const parts = firstLabel.includes("-")
-                        ? firstLabel.split("-")
-                        : firstLabel.split("/");
-                      return parseInt(parts[1]);
-                    })()}
-                    year={(() => {
-                      // Get year from the first label
-                      const firstLabel = chartData.labels[0];
-                      const parts = firstLabel.includes("-")
-                        ? firstLabel.split("-")
-                        : firstLabel.split("/");
-                      return parseInt(parts[2]) || 2024;
-                    })()}
-                  />
+                          acc[day] = value;
+                          return acc;
+                        },
+                        {}
+                      )}
+                      month={(() => {
+                        // Get month from the first label
+                        const firstLabel = chartData.labels[0];
+                        const parts = firstLabel.includes("-")
+                          ? firstLabel.split("-")
+                          : firstLabel.split("/");
+                        return parseInt(parts[1]);
+                      })()}
+                      year={(() => {
+                        // Get year from the first label
+                        const firstLabel = chartData.labels[0];
+                        const parts = firstLabel.includes("-")
+                          ? firstLabel.split("-")
+                          : firstLabel.split("/");
+                        return parseInt(parts[2]) || 2024;
+                      })()}
+                    />
+                  </div>
                   <div
                     style={{
                       display: "flex",
@@ -995,7 +1567,7 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
             <div className="section-content">
               <div style={{ display: "flex", marginBottom: "20px" }}>
                 <div style={{ width: "50%" }}>
-                  <div className="inner-row">
+                  <div className="inner-row" ref={showerChartRef}>
                     <h3>Shower Usage</h3>
                     <p>Water consumption during showers.</p>
                     {bathingData &&
@@ -1009,15 +1581,15 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
                   </div>
                 </div>
                 <div style={{ width: "50%" }}>
-                  <div className="inner-row">
+                  <div className="inner-row" ref={toiletChartRef}>
                     <h3>Toilet Usage</h3>
                     <p>Water consumption for toilet flushing.</p>
-                    {bathingData &&
-                      bathingData.labels &&
-                      bathingData.datasets && (
+                    {drinkingData &&
+                      drinkingData.labels &&
+                      drinkingData.datasets && (
                         <Bar
-                          key={JSON.stringify(bathingData)}
-                          data={bathingData}
+                          key={JSON.stringify(drinkingData)}
+                          data={drinkingData}
                         />
                       )}
                   </div>
@@ -1031,7 +1603,7 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
             <div className="section-content">
               <div style={{ display: "flex", marginBottom: "20px" }}>
                 <div style={{ width: "50%" }}>
-                  <div className="inner-row">
+                  <div className="inner-row" ref={dishwasherChartRef}>
                     <h3>Dishwasher Usage</h3>
                     <p>Water consumption during dishwashing cycles.</p>
                     {dishwashingData &&
@@ -1045,7 +1617,7 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
                   </div>
                 </div>
                 <div style={{ width: "50%" }}>
-                  <div className="inner-row">
+                  <div className="inner-row" ref={sinkChartRef}>
                     <h3>Sink Usage</h3>
                     <p>Water consumption from kitchen sink.</p>
                     {cookingData &&
@@ -1067,7 +1639,7 @@ const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
             <div className="section-content">
               <div style={{ display: "flex", marginBottom: "20px" }}>
                 <div style={{ width: "50%" }}>
-                  <div className="inner-row">
+                  <div className="inner-row" ref={washingMachineChartRef}>
                     <h3>Washing Machine Usage</h3>
                     <p>Water consumption during laundry cycles.</p>
                     {washingClothesData &&

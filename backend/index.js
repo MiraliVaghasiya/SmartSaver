@@ -1,9 +1,7 @@
 const express = require("express");
 const session = require("express-session");
-const passport = require("./middlewares/googleAuth");
+const passport = require("./middlewares/googleAuth"); // Ensure correct path
 const cors = require("cors");
-const https = require("https");
-const fs = require("fs");
 require("dotenv").config();
 require("./model/db");
 
@@ -41,15 +39,5 @@ app.use("/dashboard", dashrouter);
 app.use("/admin", dashrouter);
 app.use("/dataset", datasetRouter);
 
-// Start HTTPS server
-const sslServer = https.createServer(
-  {
-    key: fs.readFileSync("key.pem"),
-    cert: fs.readFileSync("cert.pem"),
-  },
-  app
-);
-
-sslServer.listen(port, () =>
-  console.log(`Secure server running on https://localhost:${port}`)
-);
+// Start server
+app.listen(port, () => console.log(`App listening on port ${port}!`));

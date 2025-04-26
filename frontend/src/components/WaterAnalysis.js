@@ -1,14 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import axiosInstance from "../utils/axios";
-import {
-  Line,
-  Bar,
-  Scatter,
-  Pie,
-  Radar,
-  PolarArea,
-  Doughnut,
-} from "react-chartjs-2";
+import { Line, Bar } from "react-chartjs-2";
 import * as XLSX from "xlsx";
 import {
   Chart as ChartJS,

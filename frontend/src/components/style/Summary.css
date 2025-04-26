@@ -150,11 +150,6 @@
   flex-wrap: wrap;
 }
 
-.dataset-selector {
-  flex: 1;
-  min-width: 250px;
-}
-
 .dataset-dropdown {
   width: 100%;
   padding: 10px;

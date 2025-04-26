@@ -18,6 +18,8 @@ const Dashboard = () => {
     email: "",
     displayName: "",
   });
+  const [summaryData, setSummaryData] = useState(null);
+  const [summaryType, setSummaryType] = useState(null);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -134,13 +136,19 @@ const Dashboard = () => {
 
       <div className="dashboard-content">
         {selectedOption === "water" && (
-          <WaterAnalysis setWaterData={setWaterData} />
+          <WaterAnalysis
+            setWaterData={setWaterData}
+            setSummaryData={setSummaryData}
+            setSummaryType={() => setSummaryType("water")}
+          />
         )}
         {selectedOption === "electricity" && (
           <ElectricityAnalysis
             setElectricityData={setElectricityData}
             handleFilePathChange={handleFilePathChange}
             selectedFilePath={selectedFilePath}
+            setSummaryData={setSummaryData}
+            setSummaryType={() => setSummaryType("electricity")}
           />
         )}
         {!selectedOption && (
@@ -154,7 +162,7 @@ const Dashboard = () => {
         )}
       </div>
 
-      <ChatBot waterData={waterData} electricityData={electricityData} />
+      <ChatBot summaryData={summaryData} type={summaryType} />
 
       <ToastContainer />
     </div>

@@ -16,6 +16,7 @@ import {
 import "./style/Summary.css";
 import { Doughnut } from "react-chartjs-2";
 import "./Analysis.css";
+import ElectricityMonthComparison from "./ElectricityMonthComparison";
 
 ChartJS.register(
   CategoryScale,
@@ -122,6 +123,8 @@ const ElectricityAnalysis = ({
   setElectricityData,
   handleFilePathChange,
   selectedFilePath,
+  setSummaryData,
+  setSummaryType,
 }) => {
   const [file, setFile] = useState(null);
   const fileInputRef = useRef(null);
@@ -161,7 +164,7 @@ const ElectricityAnalysis = ({
     ],
   });
   const [datasets, setDatasets] = useState([]);
-  const [summaryData, setSummaryData] = useState(null);
+  const [summaryDataState, setSummaryDataState] = useState(null);
   const [showSummary, setShowSummary] = useState(false);
   const [allDatasetsStats, setAllDatasetsStats] = useState({
     totalAverage: 0,
@@ -177,6 +180,7 @@ const ElectricityAnalysis = ({
       lights: 0,
     },
   });
+  const [isOpen, setIsOpen] = useState(false);
 
   useEffect(() => {
     // Only fetch datasets on initial load
@@ -390,18 +394,21 @@ const ElectricityAnalysis = ({
     }
   };
 
-  // New function to handle dataset selection
-  const handleDatasetChange = async (datasetId) => {
-    try {
-      setSelectedDataset(datasetId);
-      const selectedDataset = datasets.find(
-        (dataset) => dataset._id === datasetId
-      );
-      if (selectedDataset) {
-        updateAnalysisData(selectedDataset.analysis);
+  const handleDatasetChange = async (e) => {
+    const datasetId = e.target.value;
+    setSelectedDataset(datasetId);
+
+    if (datasetId) {
+      try {
+        const selectedDataset = datasets.find(
+          (dataset) => dataset._id === datasetId
+        );
+        if (selectedDataset && selectedDataset.analysis) {
+          updateAnalysisData(selectedDataset.analysis);
+        }
+      } catch (error) {
+        console.error("Error changing dataset:", error);
       }
-    } catch (error) {
-      console.error("Error changing dataset:", error);
     }
   };
 
@@ -426,9 +433,11 @@ const ElectricityAnalysis = ({
     );
 
     const generatedSummary = generateSummaryFromData(analysisData);
-    setSummaryData(generatedSummary);
+    setSummaryDataState(generatedSummary);
     setElectricityData(analysisData);
     setShowSummary(true);
+    if (typeof setSummaryData === "function") setSummaryData(generatedSummary);
+    if (typeof setSummaryType === "function") setSummaryType();
   };
 
   const handleFileChange = (e) => {
@@ -460,27 +469,63 @@ const ElectricityAnalysis = ({
       );
 
       if (response.data && response.data.analysis) {
-        const analysisData = response.data.analysis;
-
         // Clear file input
         setFile(null);
         if (fileInputRef.current) {
           fileInputRef.current.value = "";
         }
 
-        // Refresh datasets list and select the newly uploaded dataset
+        // Refresh datasets list
         const datasetsResponse = await axiosInstance.get("/dataset/datasets");
-        const electricityDatasets = datasetsResponse.data.filter(
-          (dataset) => dataset.type === "electricity"
-        );
+        const electricityDatasets = datasetsResponse.data
+          .filter((dataset) => dataset.type === "electricity")
+          .map((dataset) => {
+            if (dataset.analysis?.chartData?.labels?.[0]) {
+              const label = dataset.analysis.chartData.labels[0];
+              const parts = label.includes("-")
+                ? label.split("-")
+                : label.split("/");
+
+              if (parts.length >= 3) {
+                let monthNum, year;
+
+                // Determine month and year from the date parts
+                if (parseInt(parts[1]) >= 1 && parseInt(parts[1]) <= 12) {
+                  monthNum = parseInt(parts[1]);
+                  year = parts[2];
+                } else if (
+                  parseInt(parts[0]) >= 1 &&
+                  parseInt(parts[0]) <= 12
+                ) {
+                  monthNum = parseInt(parts[0]);
+                  year = parts[2];
+                }
+
+                // Handle year format
+                if (year < 100) {
+                  year = year >= 25 ? 2000 + year : 1900 + year;
+                }
+
+                // Update the label with the correct format
+                dataset.analysis.chartData.labels[0] = `01/${monthNum
+                  .toString()
+                  .padStart(2, "0")}/${year}`;
+              }
+            }
+            return dataset;
+          });
+
         setDatasets(electricityDatasets);
 
-        // Find the newly uploaded dataset (it should be the most recent one)
+        // Select the newly uploaded dataset
         if (electricityDatasets.length > 0) {
           const newlyUploadedDataset = electricityDatasets[0];
           setSelectedDataset(newlyUploadedDataset._id);
           updateAnalysisData(newlyUploadedDataset.analysis);
         }
+
+        // Calculate statistics
+        calculateAllDatasetsStats(electricityDatasets);
       }
     } catch (error) {
       console.error("Error uploading file:", error);
@@ -623,12 +668,12 @@ const ElectricityAnalysis = ({
           </li>
           <li>
             <strong>Your Total Usage vs Average:</strong>{" "}
-            {summaryData?.totalElectricityConsumption.toFixed(1)} kWh vs{" "}
+            {summaryDataState?.totalElectricityConsumption.toFixed(1)} kWh vs{" "}
             {allDatasetsStats.totalAverage.toFixed(1)} kWh
           </li>
           <li>
             <strong>Your Daily Usage vs Average:</strong>{" "}
-            {summaryData?.averageElectricityUsage.toFixed(1)} kWh vs{" "}
+            {summaryDataState?.averageElectricityUsage.toFixed(1)} kWh vs{" "}
             {allDatasetsStats.dailyAverage.toFixed(1)} kWh
           </li>
         </ul>
@@ -636,19 +681,29 @@ const ElectricityAnalysis = ({
     );
   };
 
+  const handleComparisonResults = (results) => {
+    // Handle comparison results if needed
+    console.log("Comparison results:", results);
+  };
+
   return (
     <div className="electricity-analysis-container">
+      <ElectricityMonthComparison
+        datasets={datasets}
+        onCompare={handleComparisonResults}
+      />
+
       <h1>Electricity Analysis</h1>
       <div className="analysis-controls">
         <div className="dataset-selector">
+          <label htmlFor="dataset-select">Select Dataset:</label>
           <select
+            id="dataset-select"
             value={selectedDataset || ""}
-            onChange={(e) => handleDatasetChange(e.target.value)}
-            className="dataset-dropdown"
+            onChange={handleDatasetChange}
           >
             <option value="">Select a dataset</option>
             {datasets.map((dataset, index) => {
-              // Extract date from dataset
               let displayDate = "";
               if (
                 dataset.analysis &&
@@ -660,23 +715,27 @@ const ElectricityAnalysis = ({
                   // Get the first date from the chart data
                   const dateStr = dataset.analysis.chartData.labels[0];
                   // Split the date string and extract month number and year
-                  const parts = dateStr.split("-");
-                  if (parts.length >= 2) {
-                    let monthNum, year;
+                  const parts = dateStr.includes("-")
+                    ? dateStr.split("-")
+                    : dateStr.split("/");
+                  let monthNum, year;
 
-                    // Check if the part is a month number (01-12)
+                  // Check if the part is a month number (01-12)
+                  if (parts.length >= 3) {
                     if (parseInt(parts[1]) >= 1 && parseInt(parts[1]) <= 12) {
                       monthNum = parseInt(parts[1]);
-                      year = "2024"; // Set the year to 2024
+                      year = parts[2]; // Use actual year from data
                     } else if (
                       parseInt(parts[0]) >= 1 &&
                       parseInt(parts[0]) <= 12
                     ) {
                       monthNum = parseInt(parts[0]);
-                      year = "2024"; // Set the year to 2024
-                    } else {
-                      monthNum = 1; // Default to January if no valid month
-                      year = "2024";
+                      year = parts[2]; // Use actual year from data
+                    }
+
+                    // Handle year parsing
+                    if (year < 100) {
+                      year = year >= 25 ? 2000 + year : 1900 + year;
                     }
 
                     // Convert month number to month name
@@ -695,18 +754,17 @@ const ElectricityAnalysis = ({
                       "December",
                     ];
                     const monthName = monthNames[monthNum - 1] || "January";
-
                     displayDate = `${monthName}-${year}`;
                   }
                 } catch (error) {
                   console.error("Error parsing date:", error);
-                  displayDate = "January-2024"; // Default fallback
+                  displayDate = "Unknown Date";
                 }
               }
 
               return (
                 <option key={dataset._id} value={dataset._id}>
-                  Dataset {index + 1} - {displayDate || "January-2024"}
+                  Dataset {index + 1} - {displayDate}
                 </option>
               );
             })}
@@ -970,41 +1028,87 @@ const ElectricityAnalysis = ({
                 Daily electricity consumption overview with color-coded
                 intensity.
               </p>
-              {chartData && chartData.labels && (
-                <Calendar
-                  data={chartData.datasets[0].data.reduce(
-                    (acc, value, index) => {
-                      // Parse the date from the label (assuming format: "DD-MM-YYYY" or "DD/MM/YYYY")
-                      const label = chartData.labels[index];
-                      const parts = label.includes("-")
-                        ? label.split("-")
-                        : label.split("/");
-                      const day = parseInt(parts[0]);
-                      const month = parseInt(parts[1]);
-                      const year = parseInt(parts[2]) || 2024;
-
-                      acc[day] = value;
-                      return acc;
-                    },
-                    {}
-                  )}
-                  month={(() => {
-                    // Get month from the first label
-                    const firstLabel = chartData.labels[0];
-                    const parts = firstLabel.includes("-")
-                      ? firstLabel.split("-")
-                      : firstLabel.split("/");
-                    return parseInt(parts[1]);
-                  })()}
-                  year={(() => {
-                    // Get year from the first label
-                    const firstLabel = chartData.labels[0];
-                    const parts = firstLabel.includes("-")
-                      ? firstLabel.split("-")
-                      : firstLabel.split("/");
-                    return parseInt(parts[2]) || 2024;
-                  })()}
-                />
+              {chartData && chartData.labels && chartData.labels.length > 0 && (
+                <>
+                  <Calendar
+                    data={(() => {
+                      const dailyData = {};
+                      chartData.labels.forEach((label, index) => {
+                        const parts = label.includes("-")
+                          ? label.split("-")
+                          : label.split("/");
+                        const day = parseInt(parts[0]);
+                        if (
+                          !isNaN(day) &&
+                          chartData.datasets[0].data[index] !== undefined
+                        ) {
+                          dailyData[day] = parseFloat(
+                            chartData.datasets[0].data[index]
+                          );
+                        }
+                      });
+                      return dailyData;
+                    })()}
+                    month={(() => {
+                      const firstLabel = chartData.labels[0];
+                      const parts = firstLabel.includes("-")
+                        ? firstLabel.split("-")
+                        : firstLabel.split("/");
+                      return parseInt(parts[1]) || 1;
+                    })()}
+                    year={(() => {
+                      const firstLabel = chartData.labels[0];
+                      const parts = firstLabel.includes("-")
+                        ? firstLabel.split("-")
+                        : firstLabel.split("/");
+                      return parseInt(parts[2]) || new Date().getFullYear();
+                    })()}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 16,
+                      marginTop: 16,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div className="legend-item">
+                      <span
+                        className="legend-color"
+                        style={{ background: "rgba(216, 180, 254, 0.4)" }}
+                      ></span>
+                      Very Low Usage
+                    </div>
+                    <div className="legend-item">
+                      <span
+                        className="legend-color"
+                        style={{ background: "rgba(165, 180, 252, 0.5)" }}
+                      ></span>
+                      Low Usage
+                    </div>
+                    <div className="legend-item">
+                      <span
+                        className="legend-color"
+                        style={{ background: "rgba(103, 232, 249, 0.6)" }}
+                      ></span>
+                      Medium Usage
+                    </div>
+                    <div className="legend-item">
+                      <span
+                        className="legend-color"
+                        style={{ background: "rgba(110, 231, 183, 0.7)" }}
+                      ></span>
+                      High Usage
+                    </div>
+                    <div className="legend-item">
+                      <span
+                        className="legend-color"
+                        style={{ background: "rgba(253, 186, 116, 0.8)" }}
+                      ></span>
+                      Very High Usage
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -1096,7 +1200,7 @@ const ElectricityAnalysis = ({
             <h2 className="section-title">Detailed Analysis</h2>
             <div className="summary-section">
               <h3>Analysis Summary</h3>
-              {summaryData && (
+              {summaryDataState && (
                 <div className="summary-content">
                   {/* Overall Usage Section */}
                   <div className="summary-section">
@@ -1107,7 +1211,7 @@ const ElectricityAnalysis = ({
                           <strong>Total Electricity:</strong>
                           <div>
                             <span className="value">
-                              {summaryData.totalElectricityConsumption.toFixed(
+                              {summaryDataState.totalElectricityConsumption.toFixed(
                                 2
                               )}{" "}
                               kWh
@@ -1116,12 +1220,12 @@ const ElectricityAnalysis = ({
                         </div>
                         <span
                           className={`status-badge ${getStatusBadge(
-                            summaryData?.totalElectricityConsumption,
+                            summaryDataState?.totalElectricityConsumption,
                             "total"
                           )}`}
                           dangerouslySetInnerHTML={{
                             __html: getStatusMessage(
-                              summaryData?.totalElectricityConsumption,
+                              summaryDataState?.totalElectricityConsumption,
                               "total"
                             ),
                           }}
@@ -1132,19 +1236,21 @@ const ElectricityAnalysis = ({
                           <strong>Daily Average:</strong>
                           <div>
                             <span className="value">
-                              {summaryData.averageElectricityUsage.toFixed(2)}{" "}
+                              {summaryDataState.averageElectricityUsage.toFixed(
+                                2
+                              )}{" "}
                               kWh
                             </span>
                           </div>
                         </div>
                         <span
                           className={`status-badge ${getStatusBadge(
-                            summaryData?.averageElectricityUsage,
+                            summaryDataState?.averageElectricityUsage,
                             "daily"
                           )}`}
                           dangerouslySetInnerHTML={{
                             __html: getStatusMessage(
-                              summaryData?.averageElectricityUsage,
+                              summaryDataState?.averageElectricityUsage,
                               "daily"
                             ),
                           }}
@@ -1154,7 +1260,7 @@ const ElectricityAnalysis = ({
                         <strong>Peak Usage Day:</strong>
                         <div>
                           <span className="value">
-                            {summaryData.maxElectricityUsage}
+                            {summaryDataState.maxElectricityUsage}
                           </span>
                         </div>
                       </li>
@@ -1171,14 +1277,17 @@ const ElectricityAnalysis = ({
                             <strong>Fan:</strong>
                             <div>
                               <span className="value">
-                                {summaryData.totalFanConsumption.toFixed(2)} kWh
+                                {summaryDataState.totalFanConsumption.toFixed(
+                                  2
+                                )}{" "}
+                                kWh
                               </span>
                               <span className="date-info">
-                                Peak: {summaryData.peakFanDay}
+                                Peak: {summaryDataState.peakFanDay}
                               </span>
                               <span className="date-info">
                                 Usage on peak day:{" "}
-                                {summaryData.peakFanUsage.toFixed(2)} kWh
+                                {summaryDataState.peakFanUsage.toFixed(2)} kWh
                               </span>
                             </div>
                           </li>
@@ -1186,17 +1295,19 @@ const ElectricityAnalysis = ({
                             <strong>Refrigerator:</strong>
                             <div>
                               <span className="value">
-                                {summaryData.totalRefrigeratorConsumption.toFixed(
+                                {summaryDataState.totalRefrigeratorConsumption.toFixed(
                                   2
                                 )}{" "}
                                 kWh
                               </span>
                               <span className="date-info">
-                                Peak: {summaryData.peakRefrigeratorDay}
+                                Peak: {summaryDataState.peakRefrigeratorDay}
                               </span>
                               <span className="date-info">
                                 Usage on peak day:{" "}
-                                {summaryData.peakRefrigeratorUsage.toFixed(2)}{" "}
+                                {summaryDataState.peakRefrigeratorUsage.toFixed(
+                                  2
+                                )}{" "}
                                 kWh
                               </span>
                             </div>
@@ -1205,17 +1316,19 @@ const ElectricityAnalysis = ({
                             <strong>Washing Machine:</strong>
                             <div>
                               <span className="value">
-                                {summaryData.totalWashingMachineConsumption.toFixed(
+                                {summaryDataState.totalWashingMachineConsumption.toFixed(
                                   2
                                 )}{" "}
                                 kWh
                               </span>
                               <span className="date-info">
-                                Peak: {summaryData.peakWashingMachineDay}
+                                Peak: {summaryDataState.peakWashingMachineDay}
                               </span>
                               <span className="date-info">
                                 Usage on peak day:{" "}
-                                {summaryData.peakWashingMachineUsage.toFixed(2)}{" "}
+                                {summaryDataState.peakWashingMachineUsage.toFixed(
+                                  2
+                                )}{" "}
                                 kWh
                               </span>
                             </div>
@@ -1228,15 +1341,18 @@ const ElectricityAnalysis = ({
                             <strong>Heater:</strong>
                             <div>
                               <span className="value">
-                                {summaryData.totalHeaterConsumption.toFixed(2)}{" "}
+                                {summaryDataState.totalHeaterConsumption.toFixed(
+                                  2
+                                )}{" "}
                                 kWh
                               </span>
                               <span className="date-info">
-                                Peak: {summaryData.peakHeaterDay}
+                                Peak: {summaryDataState.peakHeaterDay}
                               </span>
                               <span className="date-info">
                                 Usage on peak day:{" "}
-                                {summaryData.peakHeaterUsage.toFixed(2)} kWh
+                                {summaryDataState.peakHeaterUsage.toFixed(2)}{" "}
+                                kWh
                               </span>
                             </div>
                           </li>
@@ -1244,15 +1360,18 @@ const ElectricityAnalysis = ({
                             <strong>Lights:</strong>
                             <div>
                               <span className="value">
-                                {summaryData.totalLightsConsumption.toFixed(2)}{" "}
+                                {summaryDataState.totalLightsConsumption.toFixed(
+                                  2
+                                )}{" "}
                                 kWh
                               </span>
                               <span className="date-info">
-                                Peak: {summaryData.peakLightsDay}
+                                Peak: {summaryDataState.peakLightsDay}
                               </span>
                               <span className="date-info">
                                 Usage on peak day:{" "}
-                                {summaryData.peakLightsUsage.toFixed(2)} kWh
+                                {summaryDataState.peakLightsUsage.toFixed(2)}{" "}
+                                kWh
                               </span>
                             </div>
                           </li>
@@ -1270,14 +1389,17 @@ const ElectricityAnalysis = ({
                         <span className="insight-badge">
                           {(() => {
                             const consumptions = {
-                              Fan: summaryData?.totalFanConsumption || 0,
+                              Fan: summaryDataState?.totalFanConsumption || 0,
                               Refrigerator:
-                                summaryData?.totalRefrigeratorConsumption || 0,
-                              "Washing Machine":
-                                summaryData?.totalWashingMachineConsumption ||
+                                summaryDataState?.totalRefrigeratorConsumption ||
                                 0,
-                              Heater: summaryData?.totalHeaterConsumption || 0,
-                              Lights: summaryData?.totalLightsConsumption || 0,
+                              "Washing Machine":
+                                summaryDataState?.totalWashingMachineConsumption ||
+                                0,
+                              Heater:
+                                summaryDataState?.totalHeaterConsumption || 0,
+                              Lights:
+                                summaryDataState?.totalLightsConsumption || 0,
                             };
                             const maxAppliance = Object.entries(
                               consumptions
@@ -1292,12 +1414,12 @@ const ElectricityAnalysis = ({
                         <strong>Usage Status:</strong>{" "}
                         <span
                           className={`status-badge ${getStatusBadge(
-                            summaryData?.averageElectricityUsage,
+                            summaryDataState?.averageElectricityUsage,
                             "daily"
                           )}`}
                           dangerouslySetInnerHTML={{
                             __html: getStatusMessage(
-                              summaryData?.averageElectricityUsage,
+                              summaryDataState?.averageElectricityUsage,
                               "daily"
                             ),
                           }}
@@ -1315,7 +1437,7 @@ const ElectricityAnalysis = ({
       )}
 
       {/* Standalone Summary Section for when there's no chart data */}
-      {!chartData && summaryData && showSummary && (
+      {!chartData && summaryDataState && showSummary && (
         <div className="standalone-summary" style={{ marginTop: "20px" }}>
           <div className="summary-section">
             <h3>Analysis Summary</h3>
@@ -1329,19 +1451,21 @@ const ElectricityAnalysis = ({
                       <strong>Total Electricity:</strong>
                       <div>
                         <span className="value">
-                          {summaryData.totalElectricityConsumption.toFixed(2)}{" "}
+                          {summaryDataState.totalElectricityConsumption.toFixed(
+                            2
+                          )}{" "}
                           kWh
                         </span>
                       </div>
                     </div>
                     <span
                       className={`status-badge ${getStatusBadge(
-                        summaryData?.totalElectricityConsumption,
+                        summaryDataState?.totalElectricityConsumption,
                         "total"
                       )}`}
                       dangerouslySetInnerHTML={{
                         __html: getStatusMessage(
-                          summaryData?.totalElectricityConsumption,
+                          summaryDataState?.totalElectricityConsumption,
                           "total"
                         ),
                       }}
@@ -1352,18 +1476,19 @@ const ElectricityAnalysis = ({
                       <strong>Daily Average:</strong>
                       <div>
                         <span className="value">
-                          {summaryData.averageElectricityUsage.toFixed(2)} kWh
+                          {summaryDataState.averageElectricityUsage.toFixed(2)}{" "}
+                          kWh
                         </span>
                       </div>
                     </div>
                     <span
                       className={`status-badge ${getStatusBadge(
-                        summaryData?.averageElectricityUsage,
+                        summaryDataState?.averageElectricityUsage,
                         "daily"
                       )}`}
                       dangerouslySetInnerHTML={{
                         __html: getStatusMessage(
-                          summaryData?.averageElectricityUsage,
+                          summaryDataState?.averageElectricityUsage,
                           "daily"
                         ),
                       }}
@@ -1373,7 +1498,7 @@ const ElectricityAnalysis = ({
                     <strong>Peak Usage Day:</strong>
                     <div>
                       <span className="value">
-                        {summaryData.maxElectricityUsage}
+                        {summaryDataState.maxElectricityUsage}
                       </span>
                     </div>
                   </li>
@@ -1390,14 +1515,15 @@ const ElectricityAnalysis = ({
                         <strong>Fan:</strong>
                         <div>
                           <span className="value">
-                            {summaryData.totalFanConsumption.toFixed(2)} kWh
+                            {summaryDataState.totalFanConsumption.toFixed(2)}{" "}
+                            kWh
                           </span>
                           <span className="date-info">
-                            Peak: {summaryData.peakFanDay}
+                            Peak: {summaryDataState.peakFanDay}
                           </span>
                           <span className="date-info">
                             Usage on peak day:{" "}
-                            {summaryData.peakFanUsage.toFixed(2)} kWh
+                            {summaryDataState.peakFanUsage.toFixed(2)} kWh
                           </span>
                         </div>
                       </li>
@@ -1405,17 +1531,18 @@ const ElectricityAnalysis = ({
                         <strong>Refrigerator:</strong>
                         <div>
                           <span className="value">
-                            {summaryData.totalRefrigeratorConsumption.toFixed(
+                            {summaryDataState.totalRefrigeratorConsumption.toFixed(
                               2
                             )}{" "}
                             kWh
                           </span>
                           <span className="date-info">
-                            Peak: {summaryData.peakRefrigeratorDay}
+                            Peak: {summaryDataState.peakRefrigeratorDay}
                           </span>
                           <span className="date-info">
                             Usage on peak day:{" "}
-                            {summaryData.peakRefrigeratorUsage.toFixed(2)} kWh
+                            {summaryDataState.peakRefrigeratorUsage.toFixed(2)}{" "}
+                            kWh
                           </span>
                         </div>
                       </li>
@@ -1423,17 +1550,20 @@ const ElectricityAnalysis = ({
                         <strong>Washing Machine:</strong>
                         <div>
                           <span className="value">
-                            {summaryData.totalWashingMachineConsumption.toFixed(
+                            {summaryDataState.totalWashingMachineConsumption.toFixed(
                               2
                             )}{" "}
                             kWh
                           </span>
                           <span className="date-info">
-                            Peak: {summaryData.peakWashingMachineDay}
+                            Peak: {summaryDataState.peakWashingMachineDay}
                           </span>
                           <span className="date-info">
                             Usage on peak day:{" "}
-                            {summaryData.peakWashingMachineUsage.toFixed(2)} kWh
+                            {summaryDataState.peakWashingMachineUsage.toFixed(
+                              2
+                            )}{" "}
+                            kWh
                           </span>
                         </div>
                       </li>
@@ -1445,14 +1575,15 @@ const ElectricityAnalysis = ({
                         <strong>Heater:</strong>
                         <div>
                           <span className="value">
-                            {summaryData.totalHeaterConsumption.toFixed(2)} kWh
+                            {summaryDataState.totalHeaterConsumption.toFixed(2)}{" "}
+                            kWh
                           </span>
                           <span className="date-info">
-                            Peak: {summaryData.peakHeaterDay}
+                            Peak: {summaryDataState.peakHeaterDay}
                           </span>
                           <span className="date-info">
                             Usage on peak day:{" "}
-                            {summaryData.peakHeaterUsage.toFixed(2)} kWh
+                            {summaryDataState.peakHeaterUsage.toFixed(2)} kWh
                           </span>
                         </div>
                       </li>
@@ -1460,14 +1591,15 @@ const ElectricityAnalysis = ({
                         <strong>Lights:</strong>
                         <div>
                           <span className="value">
-                            {summaryData.totalLightsConsumption.toFixed(2)} kWh
+                            {summaryDataState.totalLightsConsumption.toFixed(2)}{" "}
+                            kWh
                           </span>
                           <span className="date-info">
-                            Peak: {summaryData.peakLightsDay}
+                            Peak: {summaryDataState.peakLightsDay}
                           </span>
                           <span className="date-info">
                             Usage on peak day:{" "}
-                            {summaryData.peakLightsUsage.toFixed(2)} kWh
+                            {summaryDataState.peakLightsUsage.toFixed(2)} kWh
                           </span>
                         </div>
                       </li>
@@ -1485,13 +1617,14 @@ const ElectricityAnalysis = ({
                     <span className="insight-badge">
                       {(() => {
                         const consumptions = {
-                          Fan: summaryData?.totalFanConsumption || 0,
+                          Fan: summaryDataState?.totalFanConsumption || 0,
                           Refrigerator:
-                            summaryData?.totalRefrigeratorConsumption || 0,
+                            summaryDataState?.totalRefrigeratorConsumption || 0,
                           "Washing Machine":
-                            summaryData?.totalWashingMachineConsumption || 0,
-                          Heater: summaryData?.totalHeaterConsumption || 0,
-                          Lights: summaryData?.totalLightsConsumption || 0,
+                            summaryDataState?.totalWashingMachineConsumption ||
+                            0,
+                          Heater: summaryDataState?.totalHeaterConsumption || 0,
+                          Lights: summaryDataState?.totalLightsConsumption || 0,
                         };
                         const maxAppliance = Object.entries(
                           consumptions
@@ -1506,12 +1639,12 @@ const ElectricityAnalysis = ({
                     <strong>Usage Status:</strong>{" "}
                     <span
                       className={`status-badge ${getStatusBadge(
-                        summaryData?.averageElectricityUsage,
+                        summaryDataState?.averageElectricityUsage,
                         "daily"
                       )}`}
                       dangerouslySetInnerHTML={{
                         __html: getStatusMessage(
-                          summaryData?.averageElectricityUsage,
+                          summaryDataState?.averageElectricityUsage,
                           "daily"
                         ),
                       }}

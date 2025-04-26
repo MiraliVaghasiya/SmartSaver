@@ -41,7 +41,6 @@ const DatasetUpload = () => {
       alert("Please select a file first!");
       return;
     }
-    console.log("Uploading file:", file.name);
     setLoading(true);
     const formData = new FormData();
     formData.append("dataset", file);

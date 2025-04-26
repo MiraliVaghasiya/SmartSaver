@@ -130,7 +130,7 @@ const Calendar = ({ data, month, year }) => {
   );
 };
 
-const WaterAnalysis = ({ setWaterData }) => {
+const WaterAnalysis = ({ setWaterData, setSummaryData, setSummaryType }) => {
   const [file, setFile] = useState(null);
   const [chartData, setChartData] = useState(null);
   const [drinkingData, setDrinkingData] = useState(null);
@@ -142,7 +142,7 @@ const WaterAnalysis = ({ setWaterData }) => {
     useState(null);
   const [datasets, setDatasets] = useState([]);
   const [selectedDataset, setSelectedDataset] = useState(null);
-  const [summaryData, setSummaryData] = useState({
+  const [summaryData, setSummaryDataState] = useState({
     totalWaterConsumption: 0,
     averageWaterUsage: 0,
     maxWaterUsage: "N/A",
@@ -204,18 +204,21 @@ const WaterAnalysis = ({ setWaterData }) => {
     }
   };
 
-  // New function to handle dataset selection
-  const handleDatasetChange = async (datasetId) => {
-    try {
-      setSelectedDataset(datasetId);
-      const selectedDataset = datasets.find(
-        (dataset) => dataset._id === datasetId
-      );
-      if (selectedDataset) {
-        updateAnalysisData(selectedDataset.analysis);
+  const handleDatasetChange = async (e) => {
+    const datasetId = e.target.value;
+    setSelectedDataset(datasetId);
+
+    if (datasetId) {
+      try {
+        const selectedDataset = datasets.find(
+          (dataset) => dataset._id === datasetId
+        );
+        if (selectedDataset && selectedDataset.analysis) {
+          updateAnalysisData(selectedDataset.analysis);
+        }
+      } catch (error) {
+        console.error("Error changing dataset:", error);
       }
-    } catch (error) {
-      console.error("Error changing dataset:", error);
     }
   };
 
@@ -285,9 +288,11 @@ const WaterAnalysis = ({ setWaterData }) => {
     };
 
     // Update state
-    setSummaryData(summary);
+    setSummaryDataState(summary);
     setWaterData(analysisData);
     setShowSummary(true);
+    if (typeof setSummaryData === "function") setSummaryData(summary);
+    if (typeof setSummaryType === "function") setSummaryType();
   };
 
   const handleFileChange = (e) => {
@@ -389,7 +394,7 @@ const WaterAnalysis = ({ setWaterData }) => {
         console.log("Calculated Summary:", summary);
 
         // Update state
-        setSummaryData(summary);
+        setSummaryDataState(summary);
         setWaterData(analysisData);
         setShowSummary(true);
 
@@ -628,9 +633,9 @@ const WaterAnalysis = ({ setWaterData }) => {
       <div className="analysis-controls">
         <div className="dataset-selector">
           <select
+            id="dataset-select"
             value={selectedDataset || ""}
-            onChange={(e) => handleDatasetChange(e.target.value)}
-            className="dataset-dropdown"
+            onChange={handleDatasetChange}
           >
             <option value="">Select a dataset</option>
             {datasets.map((dataset, index) => {
@@ -646,53 +651,52 @@ const WaterAnalysis = ({ setWaterData }) => {
                   // Get the first date from the chart data
                   const dateStr = dataset.analysis.chartData.labels[0];
                   // Split the date string and extract month number and year
-                  const parts = dateStr.split("-");
-                  if (parts.length >= 2) {
-                    let monthNum, year;
+                  const parts = dateStr.includes("-")
+                    ? dateStr.split("-")
+                    : dateStr.split("/");
+                  let monthNum, year;
 
-                    // Check if the part is a month number (01-12)
+                  // Check if the part is a month number (01-12)
+                  if (parts.length >= 3) {
                     if (parseInt(parts[1]) >= 1 && parseInt(parts[1]) <= 12) {
                       monthNum = parseInt(parts[1]);
-                      year = "2024"; // Set the year to 2024
+                      year = parts[2]; // Use actual year from data
                     } else if (
                       parseInt(parts[0]) >= 1 &&
                       parseInt(parts[0]) <= 12
                     ) {
                       monthNum = parseInt(parts[0]);
-                      year = "2024"; // Set the year to 2024
-                    } else {
-                      monthNum = 1; // Default to January if no valid month
-                      year = "2024";
+                      year = parts[2]; // Use actual year from data
                     }
-
-                    // Convert month number to month name
-                    const monthNames = [
-                      "January",
-                      "February",
-                      "March",
-                      "April",
-                      "May",
-                      "June",
-                      "July",
-                      "August",
-                      "September",
-                      "October",
-                      "November",
-                      "December",
-                    ];
-                    const monthName = monthNames[monthNum - 1] || "January";
-
-                    displayDate = `${monthName}-${year}`;
                   }
+
+                  // Convert month number to month name
+                  const monthNames = [
+                    "January",
+                    "February",
+                    "March",
+                    "April",
+                    "May",
+                    "June",
+                    "July",
+                    "August",
+                    "September",
+                    "October",
+                    "November",
+                    "December",
+                  ];
+                  const monthName = monthNames[monthNum - 1] || "January";
+
+                  displayDate = `${monthName}-${year}`;
                 } catch (error) {
                   console.error("Error parsing date:", error);
-                  displayDate = "January-2024"; // Default fallback
+                  displayDate = "Unknown Date";
                 }
               }
 
               return (
                 <option key={dataset._id} value={dataset._id}>
-                  Dataset {index + 1} - {displayDate || "January-2024"}
+                  Dataset {index + 1} - {displayDate}
                 </option>
               );
             })}
@@ -902,40 +906,86 @@ const WaterAnalysis = ({ setWaterData }) => {
                 Daily water consumption overview with color-coded intensity.
               </p>
               {chartData && chartData.labels && (
-                <Calendar
-                  data={chartData.datasets[0].data.reduce(
-                    (acc, value, index) => {
-                      // Parse the date from the label (assuming format: "DD-MM-YYYY" or "DD/MM/YYYY")
-                      const label = chartData.labels[index];
-                      const parts = label.includes("-")
-                        ? label.split("-")
-                        : label.split("/");
-                      const day = parseInt(parts[0]);
-                      const month = parseInt(parts[1]);
-                      const year = parseInt(parts[2]) || 2024;
+                <>
+                  <Calendar
+                    data={chartData.datasets[0].data.reduce(
+                      (acc, value, index) => {
+                        // Parse the date from the label (assuming format: "DD-MM-YYYY" or "DD/MM/YYYY")
+                        const label = chartData.labels[index];
+                        const parts = label.includes("-")
+                          ? label.split("-")
+                          : label.split("/");
+                        const day = parseInt(parts[0]);
+                        const month = parseInt(parts[1]);
+                        const year = parseInt(parts[2]) || 2024;
 
-                      acc[day] = value;
-                      return acc;
-                    },
-                    {}
-                  )}
-                  month={(() => {
-                    // Get month from the first label
-                    const firstLabel = chartData.labels[0];
-                    const parts = firstLabel.includes("-")
-                      ? firstLabel.split("-")
-                      : firstLabel.split("/");
-                    return parseInt(parts[1]);
-                  })()}
-                  year={(() => {
-                    // Get year from the first label
-                    const firstLabel = chartData.labels[0];
-                    const parts = firstLabel.includes("-")
-                      ? firstLabel.split("-")
-                      : firstLabel.split("/");
-                    return parseInt(parts[2]) || 2024;
-                  })()}
-                />
+                        acc[day] = value;
+                        return acc;
+                      },
+                      {}
+                    )}
+                    month={(() => {
+                      // Get month from the first label
+                      const firstLabel = chartData.labels[0];
+                      const parts = firstLabel.includes("-")
+                        ? firstLabel.split("-")
+                        : firstLabel.split("/");
+                      return parseInt(parts[1]);
+                    })()}
+                    year={(() => {
+                      // Get year from the first label
+                      const firstLabel = chartData.labels[0];
+                      const parts = firstLabel.includes("-")
+                        ? firstLabel.split("-")
+                        : firstLabel.split("/");
+                      return parseInt(parts[2]) || 2024;
+                    })()}
+                  />
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 16,
+                      marginTop: 16,
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <div className="legend-item">
+                      <span
+                        className="legend-color"
+                        style={{ background: "rgba(216, 180, 254, 0.4)" }}
+                      ></span>
+                      Very Low Usage
+                    </div>
+                    <div className="legend-item">
+                      <span
+                        className="legend-color"
+                        style={{ background: "rgba(165, 180, 252, 0.5)" }}
+                      ></span>
+                      Low Usage
+                    </div>
+                    <div className="legend-item">
+                      <span
+                        className="legend-color"
+                        style={{ background: "rgba(103, 232, 249, 0.6)" }}
+                      ></span>
+                      Medium Usage
+                    </div>
+                    <div className="legend-item">
+                      <span
+                        className="legend-color"
+                        style={{ background: "rgba(110, 231, 183, 0.7)" }}
+                      ></span>
+                      High Usage
+                    </div>
+                    <div className="legend-item">
+                      <span
+                        className="legend-color"
+                        style={{ background: "rgba(253, 186, 116, 0.8)" }}
+                      ></span>
+                      Very High Usage
+                    </div>
+                  </div>
+                </>
               )}
             </div>
           </div>

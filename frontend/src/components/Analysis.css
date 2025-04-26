@@ -288,4 +288,75 @@
 .comparison-analysis p {
   margin: 8px 0;
   color: #4a5568;
+}
+
+.month-comparison.electricity {
+  right: auto;
+  left: 0;
+  transform: translateX(-100%);
+}
+
+.month-comparison.electricity.open {
+  transform: translateX(0);
+}
+
+.toggle-button.electricity {
+  right: auto;
+  left: 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.toggle-button.electricity.open {
+  right: auto;
+  left: 350px;
+}
+
+.appliance-breakdown {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.appliance-breakdown h6 {
+  margin: 0 0 8px 0;
+  color: #2d3748;
+  font-size: 0.9rem;
+}
+
+.appliance-breakdown p {
+  margin: 4px 0;
+  font-size: 0.85rem;
+  color: #4a5568;
+}
+
+.dataset-selector label {
+  font-weight: 500;
+  color: #2d3748;
+}
+
+.dataset-selector select {
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  background-color: white;
+  color: #2d3748;
+  font-size: 14px;
+  min-width: 200px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dataset-selector select:hover {
+  border-color: #cbd5e0;
+}
+
+.dataset-selector select:focus {
+  outline: none;
+  border-color: #4299e1;
+  box-shadow: 0 0 0 3px rgba(66, 153, 225, 0.2);
+}
+
+.dataset-selector select option {
+  padding: 8px;
+  background-color: white;
 } 

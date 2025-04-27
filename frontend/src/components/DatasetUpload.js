@@ -11,7 +11,7 @@ import {
   Title,
   Tooltip,
   Legend,
-  ArcElement
+  ArcElement,
 } from "chart.js";
 
 ChartJS.register(
@@ -46,9 +46,13 @@ const DatasetUpload = () => {
     formData.append("dataset", file);
 
     try {
-      const response = await axios.post("http://localhost:8080/dataset/upload", formData, {
-        headers: { "Content-Type": "multipart/form-data" },
-      });
+      const response = await axios.post(
+        "https://smart-saver-backend.vercel.app/dataset/upload",
+        formData,
+        {
+          headers: { "Content-Type": "multipart/form-data" },
+        }
+      );
       console.log("Upload response:", response.data);
 
       if (response.data.success) {
@@ -68,14 +72,24 @@ const DatasetUpload = () => {
   const processData = (usagePerDay) => {
     const labels = Object.keys(usagePerDay);
     const waterUsage = labels.map((day) => usagePerDay[day].waterUsage);
-    const electricityUsage = labels.map((day) => usagePerDay[day].electricityUsage);
+    const electricityUsage = labels.map(
+      (day) => usagePerDay[day].electricityUsage
+    );
     const gasUsage = labels.map((day) => usagePerDay[day].gasUsage);
 
     setChartData({
       labels,
       datasets: [
-        { label: "Water Usage (Liters)", data: waterUsage, backgroundColor: "blue" },
-        { label: "Electricity Usage (kWh)", data: electricityUsage, backgroundColor: "yellow" },
+        {
+          label: "Water Usage (Liters)",
+          data: waterUsage,
+          backgroundColor: "blue",
+        },
+        {
+          label: "Electricity Usage (kWh)",
+          data: electricityUsage,
+          backgroundColor: "yellow",
+        },
         { label: "Gas Usage (m³)", data: gasUsage, backgroundColor: "gray" },
       ],
     });
@@ -84,8 +98,10 @@ const DatasetUpload = () => {
   return (
     <div>
       <input type="file" onChange={handleFileChange} />
-      <button onClick={handleUpload} disabled={!file || loading}>Upload & Analyze</button>
-      
+      <button onClick={handleUpload} disabled={!file || loading}>
+        Upload & Analyze
+      </button>
+
       {chartData && (
         <div>
           <h3>Consumption Analysis</h3>

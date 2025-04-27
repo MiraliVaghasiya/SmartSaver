@@ -1,5 +1,5 @@
-\node_modules
-\.env
-key.pem
-cert.pem
-csr.pem
+# \node_modules
+# \.env
+# key.pem
+# cert.pem
+# csr.pem

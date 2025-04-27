@@ -30,14 +30,28 @@ const ElectricityMonthComparison = ({ datasets, onCompare }) => {
     datasets.forEach((dataset) => {
       if (dataset?.analysis?.chartData?.labels) {
         dataset.analysis.chartData.labels.forEach((label) => {
-          const parts = label.includes("-")
-            ? label.split("-")
-            : label.split("/");
-          const monthNum = parseInt(parts[1]) - 1;
-          const year = parts[2];
-          if (!isNaN(monthNum) && year) {
-            const key = `${monthNames[monthNum]} ${year}`;
-            monthYearSet.add(key);
+          try {
+            // Try different date formats
+            let parts;
+            if (label.includes("-")) {
+              parts = label.split("-");
+            } else if (label.includes("/")) {
+              parts = label.split("/");
+            } else if (label.includes(".")) {
+              parts = label.split(".");
+            } else {
+              return; // Skip if format is not recognized
+            }
+
+            const monthNum = parseInt(parts[1]) - 1;
+            const year = parts[2];
+
+            if (!isNaN(monthNum) && monthNum >= 0 && monthNum < 12 && year) {
+              const key = `${monthNames[monthNum]} ${year}`;
+              monthYearSet.add(key);
+            }
+          } catch (error) {
+            console.error("Error parsing date:", label, error);
           }
         });
       }
@@ -62,12 +76,31 @@ const ElectricityMonthComparison = ({ datasets, onCompare }) => {
     let total = 0;
     const labels = dataset.analysis.chartData.labels;
     const data = dataset.analysis.chartData.datasets[0].data;
+
     labels.forEach((label, index) => {
-      const parts = label.includes("-") ? label.split("-") : label.split("/");
-      const monthNum = parseInt(parts[1]) - 1;
-      const labelYear = parts[2];
-      if (monthNames[monthNum] === monthName && labelYear === year) {
-        total += parseFloat(data[index]) || 0;
+      try {
+        let parts;
+        if (label.includes("-")) {
+          parts = label.split("-");
+        } else if (label.includes("/")) {
+          parts = label.split("/");
+        } else if (label.includes(".")) {
+          parts = label.split(".");
+        } else {
+          return; // Skip if format is not recognized
+        }
+
+        const monthNum = parseInt(parts[1]) - 1;
+        const labelYear = parts[2];
+
+        if (monthNames[monthNum] === monthName && labelYear === year) {
+          const value = parseFloat(data[index]);
+          if (!isNaN(value)) {
+            total += value;
+          }
+        }
+      } catch (error) {
+        console.error("Error processing data point:", label, error);
       }
     });
     return total;
@@ -77,12 +110,31 @@ const ElectricityMonthComparison = ({ datasets, onCompare }) => {
   const getApplianceMonthYearTotal = (data, monthName, year) => {
     if (!data?.labels || !data?.datasets?.[0]?.data) return 0;
     let total = 0;
+
     data.labels.forEach((label, index) => {
-      const parts = label.includes("-") ? label.split("-") : label.split("/");
-      const monthNum = parseInt(parts[1]) - 1;
-      const labelYear = parts[2];
-      if (monthNames[monthNum] === monthName && labelYear === year) {
-        total += parseFloat(data.datasets[0].data[index]) || 0;
+      try {
+        let parts;
+        if (label.includes("-")) {
+          parts = label.split("-");
+        } else if (label.includes("/")) {
+          parts = label.split("/");
+        } else if (label.includes(".")) {
+          parts = label.split(".");
+        } else {
+          return; // Skip if format is not recognized
+        }
+
+        const monthNum = parseInt(parts[1]) - 1;
+        const labelYear = parts[2];
+
+        if (monthNames[monthNum] === monthName && labelYear === year) {
+          const value = parseFloat(data.datasets[0].data[index]);
+          if (!isNaN(value)) {
+            total += value;
+          }
+        }
+      } catch (error) {
+        console.error("Error processing appliance data point:", label, error);
       }
     });
     return total;

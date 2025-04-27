@@ -4,13 +4,13 @@ import { handleError } from "../utils";
 
 const GoogleLoginButton = ({ setIsAuthenticated }) => {
   const handleSuccessResponse = (response) => {
-    fetch("http://localhost:8080/auth/google", {
+    fetch("https://smart-saver-backend.vercel.app/auth/google", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ token: response.credential }),
     })
-      .then(res => res.json())
-      .then(data => {
+      .then((res) => res.json())
+      .then((data) => {
         if (data.success) {
           localStorage.setItem("token", data.jwtToken);
           setIsAuthenticated(true); // ✅ Update state
